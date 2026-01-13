@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debt Strategy Lab</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#1e293b' } 
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom styles for print and specific components */
+        @media print {
+            body { background-color: white; color: black; }
+            .no-print { display: none; }
+            .print-only { display: block; }
+        }
+        .group-card { border-left: 4px solid #6366f1; }
+    </style>
+</head>
+<body class="text-slate-900 dark:text-slate-100 min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 transition-colors duration-100">
+
+    <!-- Header -->
+    <header class="bg-white dark:bg-slate-800 shadow p-4 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center space-y-3 md:space-y-0">
+            <div class="flex items-center space-x-4">
+                <h1 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Debt Strategy Lab</h1>
+                <span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full border border-green-200 dark:bg-green-900 dark:text-green-300 dark:border-green-800 flex items-center" title="All calculations run in your browser. No data leaves your device.">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg>
+                    Data Local Only
+                </span>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <button id="toggle-help-btn" class="text-xs flex items-center bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded transition dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-blue-300 border border-blue-200 dark:border-slate-600" title="Toggle Instructions">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    Help
+                </button>
+                 <button id="share-config-btn" class="text-xs flex items-center bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded transition dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-indigo-300 border border-indigo-200 dark:border-slate-600">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
+                    Share Settings
+                </button>
+                 <button id="share-clean-btn" class="text-xs flex items-center bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded transition dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-600">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                    Share Clean Page
+                </button>
+                <div class="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-2"></div>
+                <button id="dark-mode-toggle" class="p-2 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500" title="Toggle Dark Mode">
+                    Running in Light Mode
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Intro / Instructions -->
+        <div id="instructions-panel" class="lg:col-span-12 bg-indigo-50 dark:bg-slate-800 border-l-4 border-indigo-500 p-4 rounded shadow-sm mb-2 relative">
+            <button id="close-instructions-btn" class="absolute top-2 right-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400" title="Hide Instructions">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h2 class="text-lg font-bold text-indigo-700 dark:text-indigo-400 mb-2">Welcome to the Debt Strategy Lab</h2>
+            <p class="text-sm text-slate-700 dark:text-slate-300 mb-3">
+                This tool helps you visualize and optimize your debt repayment journey. By modeling different payment strategies 
+                (like Avalanche or Snowball) and simulating Balance Transfers, you can find the most efficient path to debt freedom.
+            </p>
+            <p class="text-xs text-amber-700 dark:text-amber-500 mb-3 font-semibold">
+                Please note: These figures are estimates. <button id="view-disclaimer-link" class="underline hover:text-amber-900 dark:hover:text-amber-300 bg-transparent border-0 p-0 inline">See disclaimer</button> regarding calculation methodology.
+            </p>
+            <details class="group">
+                <summary class="cursor-pointer text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                    How to use this tool (Click to expand)
+                </summary>
+                <ol class="mt-3 list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
+                    <li><strong>Set your Budget:</strong> Enter the total monthly amount you can afford to pay towards debts.</li>
+                    <li><strong>Add Debts:</strong> Create 'Card' groups and add balance segments (e.g., Purchases, Balance Transfers) with their respective APRs.</li>
+                    <li><strong>Simulate Transfers:</strong> Add available "Balance Transfer Offers" to see if moving high-interest debt saves you money.</li>
+                    <li><strong>Choose Strategy:</strong> Toggle between strategies (Avalanche, Snowball, etc.) to see which gets you debt-free faster.</li>
+                    <li><strong>Review Plan:</strong> Check the "Granular Action Plan" for a month-by-month guide on where to send your payments.</li>
+                </ol>
+            </details>
+            
+            <details id="instructions-extras" class="group mt-2">
+                <summary class="cursor-pointer text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                    Understanding Windfalls & Balance Transfers
+                </summary>
+                <dl class="mt-3 text-sm text-slate-600 dark:text-slate-400 space-y-3">
+                    <div>
+                        <dt id="def-windfalls" class="font-bold text-slate-700 dark:text-slate-200">Windfalls</dt>
+                        <dd class="mt-1 ml-4">
+                            These are one-off lump sums (like a bonus, tax refund, or inheritance) that you can inject into your debt payment plan at a specific future month. The simulation applies these entirely to the principal on top of your regular monthly budget.
+                        </dd>
+                    </div>
+                    <div>
+                        <dt id="def-bt" class="font-bold text-slate-700 dark:text-slate-200">Balance Transfer (BT) Offers</dt>
+                        <dd class="mt-1 ml-4">
+                            A Balance Transfer allows you to move debt from a high-interest card to a new card with a lower rate (often 0%) for a promotional period.
+                            <ul class="list-disc ml-5 mt-1 space-y-1">
+                                <li><strong>Cap:</strong> The credit limit of the new card.</li>
+                                <li><strong>Fee %:</strong> One-time cost to transfer (e.g., 3%).</li>
+                                <li><strong>Promo APR:</strong> The low rate you pay during the offer period.</li>
+                                <li><strong>Months:</strong> How long the low rate lasts before reverting to the standard rate.</li>
+                            </ul>
+                            <p class="mt-1 text-xs italic">The tool automatically calculates the best debts to move to maximize your interest savings.</p>
+                        </dd>
+                    </div>
+                </dl>
+            </details>
+        </div>
+
+        <!-- Controls Column -->
+        <div class="lg:col-span-4 space-y-6 no-print">
+            
+            <!-- Global Settings -->
+            <section class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow space-y-4">
+                <h2 class="text-lg font-semibold border-b pb-2 border-slate-200 dark:border-slate-700">Strategy Settings</h2>
+                
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Monthly Budget</label>
+                    <div class="relative mb-2">
+                        <span class="absolute left-3 top-2 text-slate-400">£</span>
+                        <input type="number" id="monthly-budget" class="w-full pl-8 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:border-slate-600" placeholder="1000">
+                    </div>
+                    <!-- Budget Slider -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-slate-400">Min</span>
+                        <input type="range" id="monthly-budget-slider" class="flex-grow h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer dark:bg-slate-600 accent-indigo-600" min="0" max="5000" step="10">
+                        <span class="text-xs text-slate-400">Max</span>
+                    </div>
+                    <p id="budget-warning" class="text-red-500 text-xs mt-1 hidden">
+                        Budget must exceed minimum payments: £<span id="min-pay-total">0</span>
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Payoff Strategy</label>
+                    <div class="space-y-2">
+                        <select id="strategy-select" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:border-slate-600">
+                            <option value="avalanche">Avalanche (Highest APR First)</option>
+                            <option value="snowball">Snowball (Lowest Balance First)</option>
+                            <option value="highest-interest-amount">Target Highest Interest Amount</option>
+                        </select>
+                        <div id="strategy-recommendation" class="hidden text-xs p-2 bg-green-50 text-green-700 border border-green-200 rounded dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
+                            <!-- Dynamic Recommendation -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Account Hierarchy -->
+            <section id="debts-section-wrapper" class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-lg font-semibold">Debts</h2>
+                    <div>
+                        <button id="toggle-debts-btn" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline mr-4">Collapse All</button>
+                        <button id="add-group-btn" class="text-sm bg-indigo-100 text-indigo-700 px-3 py-1 rounded hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300">
+                            + Add Card
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="debts-container" class="space-y-4">
+                    <!-- Groups will be injected here -->
+                </div>
+            </section>
+
+            <!-- Windfalls -->
+            <section class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow space-y-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <h2 class="text-lg font-semibold">Windfalls</h2>
+                        <button class="context-help-btn ml-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition" data-target="def-windfalls" title="What is a Windfall?">
+                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </button>
+                    </div>
+                    <button id="add-windfall-btn" class="text-sm bg-indigo-100 text-indigo-700 px-3 py-1 rounded hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300">
+                        + Add
+                    </button>
+                </div>
+                <div id="windfalls-container" class="space-y-2">
+                    <!-- Windfalls inputs will be injected here -->
+                </div>
+            </section>
+
+            <!-- BT Offers -->
+            <section class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow space-y-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center">
+                        <h2 class="text-lg font-semibold">Balance Transfer Offers</h2>
+                        <button class="context-help-btn ml-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition" data-target="def-bt" title="How do BT Offers work?">
+                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </button>
+                    </div>
+                    <button id="add-bt-btn" class="text-sm bg-indigo-100 text-indigo-700 px-3 py-1 rounded hover:bg-indigo-200 dark:bg-indigo-900 dark:text-indigo-300">
+                        + Add
+                    </button>
+                </div>
+                <div id="bt-offers-container" class="space-y-2">
+                    <!-- BT Offers inputs will be injected here -->
+                </div>
+            </section>
+        </div>
+
+        <!-- Visualization Column -->
+        <div class="lg:col-span-8 space-y-6">
+            
+            <div id="quick-details" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
+                    <h3 class="text-sm font-bold text-gray-500">Daily Interest</h3>
+                    <p id="daily-interest" class="text-2xl font-bold text-gray-800"></p>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
+                    <h3 class="text-sm font-bold text-gray-500">Payoff Time</h3>
+                    <p id="payoff-time" class="text-2xl font-bold text-gray-800"></p>
+                </div>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
+                    <h3 class="text-sm font-bold text-gray-500">BT Interest Saved</h3>
+                    <p id="interest-saved" class="text-2xl font-bold text-gray-800"></p>
+                </div>
+            </div>
+
+            <!-- Charts Area -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6" id="charts-grid">
+                <!-- Main Payoff Chart -->
+                <section class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow h-96 lg:col-span-12" id="main-chart-section">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="text-gray-500 text-sm font-bold">Payoff Timeline</h3>
+                        <button id="toggle-cost-chart-btn" class="text-xs bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-slate-700 dark:text-indigo-400 px-3 py-1 rounded-full transition flex items-center">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+                            Show Cost Breakdown
+                        </button>
+                    </div>
+                    <div class="relative h-80 w-full">
+                        <canvas id="debt-chart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Cost Breakdown Chart (Initially Hidden/Collapsed) -->
+                <section id="cost-chart-section" class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow h-96 lg:col-span-4 hidden">
+                    <div class="flex justify-between items-center mb-2">
+                         <h3 class="text-gray-500 text-sm font-bold">Total Cost of Debt</h3>
+                          <button id="close-cost-chart-btn" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                     <div class="relative h-64 w-full flex justify-center">
+                        <canvas id="cost-breakdown-chart"></canvas>
+                    </div>
+                    <div id="cost-breakdown-stats" class="mt-4 text-center text-sm text-gray-600 dark:text-gray-300">
+                        <!-- Stats injected by JS -->
+                    </div>
+                </section>
+            </div>
+
+            <!-- Report / Action Plan -->
+            <section id="report-section" class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow space-y-4 hidden">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Granular Action Plan</h2>
+                    <div class="flex space-x-2">
+                        <!-- CSV Export Button -->
+                        <button id="export-csv-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-3 py-2 rounded mt-4 flex items-center transition">
+                            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                            Export CSV
+                        </button>
+                        <!-- Print Button -->
+                        <button id="print-action-plan" class="bg-green-500 hover:bg-green-600 text-white text-sm px-3 py-2 rounded mt-4 flex items-center transition">
+                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            Print
+                        </button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 text-sm mb-4">
+                    <div class="bg-slate-100 dark:bg-slate-700 p-3 rounded">
+                        <span class="block text-slate-500 text-xs uppercase">Payoff Date</span>
+                        <strong id="payoff-date-display" class="text-lg">-</strong>
+                    </div>
+                    <div class="bg-slate-100 dark:bg-slate-700 p-3 rounded">
+                        <span class="block text-slate-500 text-xs uppercase">Total Interest</span>
+                        <strong id="total-interest-display" class="text-lg">-</strong>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-slate-50 dark:bg-slate-700 text-slate-500 uppercase text-xs">
+                            <tr>
+                                <th class="p-3">Month</th>
+                                <th class="p-3">Action</th>
+                                <th class="p-3 text-right">Payment</th>
+                                <th class="p-3 text-right">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-table-body" class="divide-y divide-slate-200 dark:divide-slate-700">
+                            <!-- Rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+
+            </section>
+        </div>
+
+    </main>
+
+    <!-- Templates for Dynamic Content -->
+    <template id="group-template">
+        <div class="group-item bg-white dark:bg-slate-850 rounded-lg shadow-sm transition-all duration-300" style="border-left-width: 4px;">
+            <div class="p-4">
+                <div class="flex justify-between items-center">
+                    <div class="flex-grow flex items-center">
+                        <span class="group-name-text text-lg font-bold hidden"></span>
+                        <input type="text" class="group-name p-2 text-lg font-bold bg-transparent focus:bg-slate-50 dark:focus:bg-slate-800 rounded" placeholder="e.g., Credit Card">
+                        <span class="total-balance font-bold text-slate-500 dark:text-slate-400 ml-4 hidden"></span>
+                    </div>
+                    <div>
+                        <button class="toggle-group-details text-indigo-600 dark:text-indigo-400 text-sm mr-2" title="Collapse/Expand">Collapse</button>
+                        <button class="remove-group text-slate-400 hover:text-red-500 text-2xl">&times;</button>
+                    </div>
+                </div>
+                <div class="group-body">
+                    <div class="min-payment-controls mb-3 p-3 bg-slate-50 dark:bg-slate-800 rounded border border-slate-200 dark:border-slate-700">
+                        <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Minimum Payment Calculation</label>
+                        <div class="flex space-x-2">
+                            <select class="min-pay-type w-3/4 p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600">
+                                <option value="percentage_plus_interest">Interest + Percentage (e.g. 1%)</option>
+                                <option value="percentage_balance">Percentage of Balance (e.g. 2.5%)</option>
+                                <option value="fixed">Fixed Amount (e.g. £50)</option>
+                            </select>
+                            <input type="number" class="min-pay-val w-1/4 p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="1.0" value="1.0">
+                        </div>
+                    </div>
+
+                    <div class="segments-container mt-3 space-y-3">
+                        <!-- Segments will be added here -->
+                    </div>
+                    <button class="add-segment-btn mt-4 text-sm text-indigo-600 dark:text-indigo-400 font-semibold">+ Add Balance Segment</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <template id="segment-template">
+        <div class="segment-item border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+            <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-11">
+                    <input type="text" class="segment-name w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Label (e.g. Purchases)">
+                </div>
+                <div class="col-span-1 text-center">
+                    <button class="remove-segment text-slate-300 hover:text-red-500">&times;</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-12 gap-2 items-center mt-2">
+                <div class="col-span-6">
+                    <label class="block text-[10px] font-bold uppercase text-slate-500">Balance</label>
+                    <input type="number" class="segment-balance w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Balance">
+                </div>
+                <div class="col-span-6">
+                    <label class="block text-[10px] font-bold uppercase text-slate-500">Current APR</label>
+                    <input type="number" class="segment-apr w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="APR">
+                </div>
+            </div>
+            <div class="grid grid-cols-12 gap-2 items-center mt-2">
+                <div class="col-span-12">
+                    <label class="flex items-center text-xs">
+                        <input type="checkbox" class="segment-has-promo h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                        <span class="ml-2 text-slate-600 dark:text-slate-300">Has Promo Rate?</span>
+                    </label>
+                </div>
+            </div>
+            <div class="promo-fields hidden mt-2 grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-6">
+                    <label class="block text-[10px] font-bold uppercase text-slate-500">Promo Months</label>
+                    <input type="number" class="segment-promo-months w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Months left">
+                </div>
+                <div class="col-span-6">
+                    <label class="block text-[10px] font-bold uppercase text-slate-500">Post-Promo APR</label>
+                    <input type="number" class="segment-post-promo-apr w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Future APR">
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <footer id="disclaimer" class="bg-slate-100 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-6 mt-8">
+        <div class="max-w-7xl mx-auto text-center">
+            <p class="text-xs text-slate-500 dark:text-slate-500 max-w-3xl mx-auto leading-relaxed">
+                <strong>Disclaimer:</strong> This tool is for educational and informational purposes only and does not constitute financial advice. 
+                Calculations are estimates based on the information provided and may not reflect exact bank practices regarding interest compounding, payment allocation, or fees. 
+                <strong>Important:</strong> Actual results will vary. Card issuers often calculate interest based on 'Average Daily Balance' and apply payments on specific dates which affects the interest charged. 
+                This tool assumes a simplified monthly model where payments are made once per cycle. It does not account for weekends, holidays, specific payment clearing times, or varying month lengths.
+                You should not rely solely on this tool for making financial decisions. 
+                Always consult with a qualified financial advisor before making major financial decisions or changes to your debt management strategy.
+            </p>
+            <p class="text-xs text-slate-400 dark:text-slate-600 mt-2">
+                &copy; 2026 Debt Strategy Lab. Local execution only. No data is sent to any server.
+            </p>
+        </div>
+    </footer>
+
+    <script type="module" src="js/app.js"></script>
+</body>
+</html>

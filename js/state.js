@@ -1,0 +1,207 @@
+// State Management & Persistence
+// Serialisation/Deserialisation to URL hash
+
+function encodeState(obj) {
+    try {
+        const json = JSON.stringify(obj);
+        return btoa(unescape(encodeURIComponent(json)));
+    } catch (e) {
+        return '';
+    }
+}
+
+function decodeState(str) {
+    try {
+        const json = decodeURIComponent(escape(atob(str)));
+        return JSON.parse(json);
+    } catch (e) {
+        return null;
+    }
+}
+
+export function serializeToURL(stateObj) {
+    const encoded = encodeState(stateObj);
+    if (encoded) {
+        window.location.hash = encoded;
+    }
+}
+
+export function deserializeFromURL() {
+    const hash = (window.location.hash || '').replace(/^#/, '');
+    if (!hash) return null;
+    return decodeState(hash);
+}
+
+export function gatherStateFromDOM() {
+    const state = { groups: [], windfalls: [], btOffers: [], monthlyBudget: 0, strategy: 'avalanche' };
+    const budgetEl = document.getElementById('monthly-budget');
+    if (budgetEl) state.monthlyBudget = Number(budgetEl.value) || 0;
+    const stratEl = document.getElementById('strategy-select');
+    if (stratEl) state.strategy = stratEl.value;
+
+    const groups = document.querySelectorAll('.group-item');
+    groups.forEach((gEl, gi) => {
+        const name = gEl.querySelector('.group-name').value || `Card ${gi+1}`;
+        const minPayType = gEl.querySelector('.min-pay-type')?.value || 'percentage_plus_interest';
+        const minPayVal = Number(gEl.querySelector('.min-pay-val')?.value) || 1.0;
+        
+        const segments = [];
+        gEl.querySelectorAll('.segment-item').forEach((sEl, si) => {
+            const hasPromo = sEl.querySelector('.segment-has-promo').checked;
+            segments.push({
+                id: `${gi}-${si}`,
+                name: sEl.querySelector('.segment-name').value || '',
+                balance: Number(sEl.querySelector('.segment-balance').value) || 0,
+                apr: Number(sEl.querySelector('.segment-apr').value) || 0,
+                hasPromo: hasPromo,
+                promoMonths: hasPromo ? Number(sEl.querySelector('.segment-promo-months').value) || 0 : 0,
+                postPromoApr: hasPromo ? Number(sEl.querySelector('.segment-post-promo-apr').value) || 0 : 0,
+            });
+        });
+        state.groups.push({ id: gi, name, minPayType, minPayVal, segments });
+    });
+
+    // Windfalls
+    document.querySelectorAll('.windfall-item').forEach(w => {
+        state.windfalls.push({ month: Number(w.querySelector('.windfall-month').value)||0, amount: Number(w.querySelector('.windfall-amount').value)||0 });
+    });
+
+    // BT Offers
+    document.querySelectorAll('.bt-item').forEach(b => {
+        state.btOffers.push({ 
+            id: b.dataset.btId,
+            name: b.querySelector('.bt-name')?.value || `BT ${b.dataset.btId}`,
+            cap: Number(b.querySelector('.bt-cap').value)||0, 
+            feePercent: Number(b.querySelector('.bt-fee').value)||0, 
+            promoApr: Number(b.querySelector('.bt-promo-apr').value)||0, 
+            months: Number(b.querySelector('.bt-months').value)||0,
+            postPromoApr: Number(b.querySelector('.bt-post-promo-apr').value) || 0,
+            enabled: b.querySelector('.bt-enabled').checked
+        });
+    });
+    
+    state.darkMode = document.documentElement.classList.contains('dark');
+    return state;
+}
+
+export function restoreStateToDOM(state) {
+    if (!state) return;
+    // set global settings
+    const budgetEl = document.getElementById('monthly-budget');
+    if (budgetEl) budgetEl.value = state.monthlyBudget || '';
+    const stratEl = document.getElementById('strategy-select');
+    if (stratEl) stratEl.value = state.strategy || 'avalanche';
+    if (state.darkMode) {
+        document.documentElement.classList.add('dark');
+        document.getElementById('dark-mode-toggle').textContent = 'Running in Dark Mode';
+    }
+
+    // Clear existing groups
+    const container = document.getElementById('debts-container');
+    container.innerHTML = '';
+    const groupTemplate = document.getElementById('group-template');
+    (state.groups || []).forEach((g, gi) => {
+        const clone = groupTemplate.content.cloneNode(true);
+        const el = clone.querySelector('.group-item');
+        el.querySelector('.group-name').value = g.name || '';
+        
+        // Restore min pay settings
+        const typeSel = el.querySelector('.min-pay-type');
+        if (typeSel) typeSel.value = g.minPayType || 'percentage_plus_interest';
+        const valInp = el.querySelector('.min-pay-val');
+        if (valInp) valInp.value = g.minPayVal || 1.0;
+
+        const segContainer = el.querySelector('.segments-container');
+        const segTemplate = document.getElementById('segment-template');
+        (g.segments || []).forEach(s => {
+            const sClone = segTemplate.content.cloneNode(true);
+            sClone.querySelector('.segment-name').value = s.name || '';
+            sClone.querySelector('.segment-balance').value = s.balance || 0;
+            sClone.querySelector('.segment-apr').value = s.apr || 0;
+            const hasPromoCheck = sClone.querySelector('.segment-has-promo');
+            const promoFields = sClone.querySelector('.promo-fields');
+            if (s.hasPromo) {
+                hasPromoCheck.checked = true;
+                promoFields.classList.remove('hidden');
+                sClone.querySelector('.segment-promo-months').value = s.promoMonths || 0;
+                sClone.querySelector('.segment-post-promo-apr').value = s.postPromoApr || 0;
+            }
+            segContainer.appendChild(sClone);
+        });
+        container.appendChild(el);
+    });
+
+    // Restore Windfalls
+    const windfallsContainer = document.getElementById('windfalls-container');
+    windfallsContainer.innerHTML = '';
+    (state.windfalls || []).forEach(w => {
+        const div = document.createElement('div');
+        div.className = 'windfall-item bg-white dark:bg-slate-850 p-3 rounded-lg shadow-sm relative';
+        div.innerHTML = `
+            <button class="remove-windfall absolute top-2 right-2 text-slate-400 hover:text-red-500 text-lg">&times;</button>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Month</label>
+                    <input type="number" class="windfall-month w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${w.month || ''}">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Amount</label>
+                    <input type="number" class="windfall-amount w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${w.amount || ''}">
+                </div>
+            </div>
+        `;
+        windfallsContainer.appendChild(div);
+    });
+
+    // Restore BT Offers
+    const btOffersContainer = document.getElementById('bt-offers-container');
+    btOffersContainer.innerHTML = '';
+    (state.btOffers || []).forEach(bt => {
+        const div = document.createElement('div');
+        div.className = 'bt-item bg-white dark:bg-slate-850 p-3 rounded-lg shadow-sm relative';
+        div.dataset.btId = bt.id;
+        const isEnabled = bt.enabled !== false; // Default to true if undefined
+        div.innerHTML = `
+            <div class="flex justify-between items-center mb-2">
+                <input type="text" class="bt-name flex-grow p-1 text-sm font-semibold border border-transparent rounded dark:bg-slate-850 dark:border-transparent focus:border-slate-300 dark:focus:border-slate-600 mr-2" value="${bt.name || ''}" placeholder="e.g. New Card Offer">
+                <div class="flex items-center space-x-2">
+                    <label class="flex items-center cursor-pointer">
+                        <input type="checkbox" class="bt-enabled sr-only peer" ${isEnabled ? 'checked' : ''}>
+                        <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                    </label>
+                    <button class="remove-bt text-slate-400 hover:text-red-500 text-lg">&times;</button>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Cap</label>
+                    <input type="number" class="bt-cap w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.cap || ''}">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Fee %</label>
+                    <input type="number" class="bt-fee w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.feePercent || ''}">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Promo APR</label>
+                    <input type="number" class="bt-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.promoApr || ''}">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Months</label>
+                    <input type="number" class="bt-months w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.months || ''}">
+                </div>
+                <div class="col-span-2">
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Post-Promo APR</label>
+                    <input type="number" class="bt-post-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.postPromoApr || ''}">
+                </div>
+            </div>
+        `;
+        btOffersContainer.appendChild(div);
+    });
+}
+
+export default {
+    serializeToURL,
+    deserializeFromURL,
+    gatherStateFromDOM,
+    restoreStateToDOM,
+};
