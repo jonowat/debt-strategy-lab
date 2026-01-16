@@ -502,6 +502,24 @@ function wireControls(debouncedUpdate) {
         });
     }
 
+    // Extract Scenario Button
+    const extractBtn = document.getElementById('extract-scenario-btn');
+    if (extractBtn) {
+        extractBtn.addEventListener('click', () => {
+            const state = gatherStateFromDOM();
+            // Don't need dark mode in scenario test data usually
+            delete state.darkMode; 
+            const json = JSON.stringify(state, null, 4);
+            
+            navigator.clipboard.writeText(json).then(() => {
+                const originalText = extractBtn.innerHTML;
+                extractBtn.innerHTML = `<span class="font-bold">JSON Copied!</span>`;
+                console.log('Scenario JSON:', json);
+                setTimeout(() => { extractBtn.innerHTML = originalText; }, 2000);
+            });
+        });
+    }
+
     // Dark mode toggle
     const dm = document.getElementById('dark-mode-toggle');
     dm.addEventListener('click', () => {
@@ -551,6 +569,10 @@ function wireControls(debouncedUpdate) {
         const el = clone.querySelector('.group-item');
         setupGroupElement(el, debouncedUpdate);
         document.getElementById('debts-container').appendChild(el);
+        
+        // Automatically add the first segment so it's visible immediately
+        el.querySelector('.add-segment-btn').click();
+        
         debouncedUpdate();
     });
 
@@ -612,9 +634,20 @@ function wireControls(debouncedUpdate) {
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Months</label>
                     <input type="number" class="bt-months w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="12">
                 </div>
-                <div class="col-span-2">
+                <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Post-Promo APR</label>
                     <input type="number" class="bt-post-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="21.9">
+                </div>
+                <div class="col-span-3">
+                    <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Minimum Payment Calculation</label>
+                    <div class="flex space-x-2">
+                        <select class="bt-min-pay-type w-2/3 p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600">
+                             <option value="percentage_balance" selected>Percentage of Balance</option>
+                             <option value="percentage_plus_interest">Interest + Percentage</option>
+                             <option value="fixed">Fixed Amount</option>
+                        </select>
+                        <input type="number" class="bt-min-pay-val w-1/3 p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" placeholder="1.0" value="1.0">
+                    </div>
                 </div>
             </div>
         `;

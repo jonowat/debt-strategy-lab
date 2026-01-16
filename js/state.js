@@ -76,6 +76,8 @@ export function gatherStateFromDOM() {
             promoApr: Number(b.querySelector('.bt-promo-apr').value)||0, 
             months: Number(b.querySelector('.bt-months').value)||0,
             postPromoApr: Number(b.querySelector('.bt-post-promo-apr').value) || 0,
+            minPayType: b.querySelector('.bt-min-pay-type')?.value || 'percentage_balance',
+            minPayVal: Number(b.querySelector('.bt-min-pay-val')?.value) || 1.0,
             enabled: b.querySelector('.bt-enabled').checked
         });
     });
@@ -189,9 +191,25 @@ export function restoreStateToDOM(state) {
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Months</label>
                     <input type="number" class="bt-months w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.months || ''}">
                 </div>
-                <div class="col-span-2">
+                <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Post-Promo APR</label>
                     <input type="number" class="bt-post-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.postPromoApr || ''}">
+                </div>
+                <div class="col-span-3">
+                    <div class="flex space-x-2 items-end">
+                        <div class="flex-grow">
+                             <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Minimum Payment Calculation</label>
+                             <select class="bt-min-pay-type w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600">
+                                 <option value="percentage_balance" ${(!bt.minPayType || bt.minPayType==='percentage_balance')?'selected':''}>Percentage of Balance</option>
+                                 <option value="percentage_plus_interest" ${(bt.minPayType==='percentage_plus_interest')?'selected':''}>Interest + Percentage</option>
+                                 <option value="fixed" ${(bt.minPayType==='fixed')?'selected':''}>Fixed Amount</option>
+                            </select>
+                        </div>
+                        <div class="w-1/3">
+                            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Value</label>
+                            <input type="number" class="bt-min-pay-val w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.minPayVal || 1.0}">
+                        </div>
+                    </div>
                 </div>
             </div>
         `;

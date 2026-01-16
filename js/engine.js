@@ -203,7 +203,7 @@ export function runSimulation(state, options = {}) {
                     segs.push({
                         groupId: `bt-${offer.id}`,
                         groupName: offer.name || `BT ${offer.id}`,
-                        minPayType: 'percentage',
+                        minPayType: offer.minPayType || 'percentage_balance',
                         minPayVal: Number(offer.minPayVal) || 1.0,
                         id: newBtSegmentId,
                         name: `BT from ${source.groupName}`,
