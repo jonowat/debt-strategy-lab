@@ -174,6 +174,9 @@ export function runSimulation(state, options = {}) {
                         return (b.balance || 0) - (a.balance || 0);
                     });
                 let remainingCap = cap;
+                let totalBtBalance = 0;
+                let sourcesList = [];
+
                 for (const source of sourceSegs) {
                     if (remainingCap <= 0) break;
                     const take = Math.min(source.balance, remainingCap);
@@ -187,8 +190,10 @@ export function runSimulation(state, options = {}) {
                     source.balance -= take;
                     const fee = take * (Number(offer.feePercent||0)/100);
                     results.totalFees += fee;
-                    const newBtSegmentId = `bt-${offer.id}-${month}`;
-                    
+                    const segmentBalance = take + fee;
+                    totalBtBalance += segmentBalance;
+                    sourcesList.push(source.groupName);
+
                     // Log the action
                     monthRecord.btActions.push({
                         sourceCard: source.groupName,
@@ -196,23 +201,26 @@ export function runSimulation(state, options = {}) {
                         amount: take,
                         destinationCard: offer.name || `BT ${offer.id}`,
                         fee: fee,
-                        newBalance: take + fee
+                        newBalance: segmentBalance
                     });
+                    remainingCap -= take;
+                }
 
-                    // create new segment representing BT balance with promo APR
-                    segs.push({
+                if (totalBtBalance > 0) {
+                     // create ONE new segment representing consolidated BT balance
+                     const newBtSegmentId = `bt-${offer.id}-${month}`;
+                     segs.push({
                         groupId: `bt-${offer.id}`,
                         groupName: offer.name || `BT ${offer.id}`,
                         minPayType: offer.minPayType || 'percentage_balance',
                         minPayVal: Number(offer.minPayVal) || 1.0,
                         id: newBtSegmentId,
-                        name: `BT from ${source.groupName}`,
-                        balance: take + fee,
+                        name: `Transfer from ${sourcesList.join(', ')}`,
+                        balance: totalBtBalance,
                         apr: Number(offer.promoApr) || 0,
                         promoMonths: Number(offer.months) || 0,
-                        postPromoApr: Number(offer.postPromoApr) || source.apr, // Reverts to source APR if not specified
+                        postPromoApr: Number(offer.postPromoApr) || 0, 
                     });
-                    remainingCap -= take;
                 }
                 offer.applied = true;
             }
