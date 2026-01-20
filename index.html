@@ -159,6 +159,16 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="mt-2 border-t pt-2 border-slate-200 dark:border-slate-700">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="use-calendar-mode" class="form-checkbox text-indigo-600 rounded focus:ring-indigo-500 dark:bg-slate-700 dark:border-slate-600">
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-400">Use Real Calendar Dates</span>
+                    </label>
+                     <p class="text-xs text-slate-500 mt-1 ml-6">
+                        Uses actual month lengths (28/30/31 days) for label accuracy and day-count interest calculation.
+                    </p>
+                </div>
             </section>
 
             <!-- Account Hierarchy -->
@@ -221,15 +231,15 @@
             <div id="quick-details" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
                     <h3 class="text-sm font-bold text-gray-500">Daily Interest</h3>
-                    <p id="daily-interest" class="text-2xl font-bold text-gray-800"></p>
+                    <p id="daily-interest" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
                     <h3 class="text-sm font-bold text-gray-500">Payoff Time</h3>
-                    <p id="payoff-time" class="text-2xl font-bold text-gray-800"></p>
+                    <p id="payoff-time" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
                     <h3 class="text-sm font-bold text-gray-500">BT Interest Saved</h3>
-                    <p id="interest-saved" class="text-2xl font-bold text-gray-800"></p>
+                    <p id="interest-saved" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
             </div>
 
@@ -399,7 +409,7 @@
                 <strong>Disclaimer:</strong> This tool is for educational and informational purposes only and does not constitute financial advice. 
                 Calculations are estimates based on the information provided and may not reflect exact bank practices regarding interest compounding, payment allocation, or fees. 
                 <strong>Important:</strong> Actual results will vary. Card issuers often calculate interest based on 'Average Daily Balance' and apply payments on specific dates which affects the interest charged. 
-                This tool assumes a simplified monthly model where payments are made once per cycle. It does not account for weekends, holidays, specific payment clearing times, or varying month lengths.
+                This tool assumes a simplified monthly model where payments are made once per cycle, using actual month lengths for interest calculation.
                 You should not rely solely on this tool for making financial decisions. 
                 Always consult with a qualified financial advisor before making major financial decisions or changes to your debt management strategy.
             </p>
@@ -409,6 +419,6 @@
         </div>
     </footer>
 
-    <script type="module" src="js/app.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -81,7 +81,10 @@ export function gatherStateFromDOM() {
             enabled: b.querySelector('.bt-enabled').checked
         });
     });
-    
+
+    const calendarModeEl = document.getElementById('use-calendar-mode');
+    state.useCalendar = calendarModeEl ? calendarModeEl.checked : false;
+
     state.darkMode = document.documentElement.classList.contains('dark');
     return state;
 }
@@ -96,6 +99,11 @@ export function restoreStateToDOM(state) {
     if (state.darkMode) {
         document.documentElement.classList.add('dark');
         document.getElementById('dark-mode-toggle').textContent = 'Running in Dark Mode';
+    }
+
+    const calendarModeEl = document.getElementById('use-calendar-mode');
+    if (calendarModeEl) {
+        calendarModeEl.checked = state.useCalendar || false;
     }
 
     // Clear existing groups

@@ -108,11 +108,33 @@ export function runSimulation(state, options = {}) {
     const btOffers = (state.btOffers || [])
         .filter(o => o.enabled !== false)
         .map(o => ({...o}));
+    
+    // Start simulation from current month if using calendar mode
+    const useCalendar = state.useCalendar !== false; // Default to true if undefined or allow explicit false? User wants toggle.
+    // Actually, let's treat it as opt-in for now to match UI check, OR default true if we want modernization.
+    // The UI checkbox defaults to unchecked in HTML. So let's respect that.
+    
+    const startDate = new Date();
+    startDate.setDate(1);
 
     let month = 0;
     while (month < maxMonths) {
         month += 1;
+        
+        let daysInMonth = 30;
+        let monthLabel = null;
 
+        if (useCalendar) {
+            // Determine actual month context for ADB days calculation
+            const currentSimDate = new Date(startDate.getFullYear(), startDate.getMonth() + (month - 1), 1);
+            daysInMonth = new Date(currentSimDate.getFullYear(), currentSimDate.getMonth() + 1, 0).getDate();
+            
+            // Format Label: "Jan 2026"
+            const mo = currentSimDate.toLocaleString('default', { month: 'short' });
+            const yr = currentSimDate.getFullYear();
+            monthLabel = `${mo} ${yr}`;
+        }
+        
         // Update APR for segments where promo period has ended
         segs.forEach(s => {
             if (s.promoMonths > 0) {
@@ -126,21 +148,28 @@ export function runSimulation(state, options = {}) {
 
         // Opening balances & accrue interest for the month
         let openingTotal = 0;
-        const interestBySeg = {};
+        let interestThisMonth = 0;
+        const interestBySeg = {}; // Used just for Min Pay calculation estimate
         const openingInfo = [];
         segs.forEach(s => {
             const openingBal = s.balance;
             openingTotal += openingBal;
-            const interest = calculateMonthlyInterest(openingBal, s.apr);
-            s.balance += interest; // Accrue interest first
+
+            // Simplified Interest Calculation: Balance * DailyRate * DaysInMonth
+            const dailyRate = calculateDailyInterestRate(s.apr);
+            const interest = openingBal * dailyRate * daysInMonth;
+            
+            s.balance += interest;
+            interestThisMonth += interest;
+            results.totalInterest += interest;
+
             interestBySeg[s.id] = interest;
             const min = calculateMinPayment(openingBal, s.minPayType, s.minPayVal, interest);
-            const minPaid = Math.min(min, s.balance); // Pay against new balance
+            const minPaid = Math.min(min, s.balance); // Pay against balance (which now includes interest)
             openingInfo.push({ id: s.id, name: s.name, groupName: s.groupName, openingBalance: openingBal, apr: s.apr, interest, minPayment: min, minPaid });
         });
         monthRecord.openingTotal = openingTotal;
-        monthRecord.interest = openingInfo.reduce((acc, i) => acc + i.interest, 0);
-        results.totalInterest += monthRecord.interest;
+        monthRecord.interest = interestThisMonth;
 
         // Calculate minimum payments and deduct them first
         let minPaymentsTotal = 0;
@@ -249,21 +278,16 @@ export function runSimulation(state, options = {}) {
             paymentsMap[t.id].extraPaid += pay;
         }
 
-        // After payments, apply compounding: add monthly interest based on opening balances
-        let interestThisMonth = 0;
-        segs.forEach(s => {
-            const interest = interestBySeg[s.id] || 0;
-            // s.balance += interest; // Interest is now accrued before payments
-            interestThisMonth += interest;
-        });
 
-        // monthRecord.interest = interestThisMonth;
-        // results.totalInterest += interestThisMonth;
+        // After payments, apply compounding: Simple Interest based on Days in Month
+        // Snapshots and month records are already mostly set.
+        // monthRecord.interest and results.totalInterest were updated at the start of the month loop.
 
         // Capture per-segment snapshot
         monthRecord.openingSegments = openingInfo.map(i => ({ ...i }));
         monthRecord.segments = segs.map(s => ({ id: s.id, name: s.name, balance: Number(s.balance.toFixed(2)), apr: s.apr, groupId: s.groupId, groupName: s.groupName }));
         monthRecord.payments = paymentsMap;
+        monthRecord.label = monthLabel; // Store formatted label
 
         // Closing total
         const closingTotal = segs.reduce((acc,s)=>acc + s.balance, 0);

@@ -1,42 +1,7 @@
 
 import { calculateMinPayment, runSimulation, calculateMonthlyInterest, calculateDailyInterestRate } from '../js/engine.js';
 import assert from 'assert';
-
-// --- Test Framework Helpers ---
-const filter = process.argv[2];
-let testsRun = 0;
-let testsPassed = 0;
-let testsFailed = 0;
-let testsSkipped = 0;
-
-function test(name, fn) {
-    if (filter && !name.toLowerCase().includes(filter.toLowerCase())) {
-        testsSkipped++;
-        return;
-    }
-    testsRun++;
-    try {
-        fn();
-        console.log(`✅ PASS: ${name}`);
-        testsPassed++;
-    } catch (e) {
-        console.error(`❌ FAIL: ${name}`);
-        console.error(e.message);
-        testsFailed++;
-    }
-}
-
-function summarize() {
-    console.log(`\n--- Test Summary ---`);
-    if (filter) console.log(`Filter: "${filter}"`);
-    console.log(`Run:    ${testsRun}`);
-    console.log(`Passed: ${testsPassed}`);
-    console.log(`Failed: ${testsFailed}`);
-    console.log(`Skipped:${testsSkipped}`);
-    if (testsFailed > 0) process.exit(1);
-}
-
-// --- Test Objects / Factories ---
+import { test } from './test_framework.js';
 
 export const Scenarios = {
     simpleCard: () => ({
@@ -225,4 +190,22 @@ test('Large balance transfer scenario', () => {
     assert.strictEqual(activeSegments.length, 1, `Should have consolidated to one active segment. Found ${activeSegments.length}: ${activeSegments.map(s => `${s.name} (£${s.balance.toFixed(2)})`).join(', ')}`);
     assert.ok(String(activeSegments[0].groupId).startsWith('bt-'), 'The active segment should be the BT segment');
 })
-summarize();
+
+test('Simulation: Minimum Payments Only', () => {
+    const s = Scenarios.simpleCard();
+    s.monthlyBudget = 1000; // High budget
+    s.minOnlyMode = true; // But min only activated
+    
+    const results = runSimulation(s);
+    
+    // With 1000 balance at 20% APR, Interest is ~16.
+    // Min pay (1% + interest) is ~26.
+    // If budget of 1000 was used, it would be paid in 1 month.
+    // If min only is used, it should take many months.
+    assert.ok(results.payoffMonth > 10, 'Should take a long time to pay off with minimums only');
+    
+    const m1 = results.months[0];
+    const totalPaid = Object.values(m1.payments).reduce((acc, p) => acc + p.minPaid + p.extraPaid, 0);
+    assert.ok(totalPaid < 50, 'Monthly payment should be small (just the minimum)');
+});
+

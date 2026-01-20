@@ -84,7 +84,7 @@ function updateChart(simResults) {
         document.getElementById('cost-breakdown-stats').innerHTML = '';
         return;
     }
-    const months = simResults.months.map(m => `M${m.month}`);
+    const months = simResults.months.map(m => m.label || `M${m.month}`);
     // One dataset for total
     const totalData = simResults.months.map(m => Number(m.closingTotal.toFixed(2)));
     chart.data.labels = months;
@@ -175,16 +175,17 @@ function downloadCSV(simResults) {
 
     simResults.months.forEach(m => {
         // Summary Row
+        const monthLabel = m.label ? m.label : `Month ${m.month}`;
         let summaryDesc = `Total Interest: ${m.interest.toFixed(2)}`;
         if (m.windfall > 0) summaryDesc += ` | Windfall: +${m.windfall.toFixed(2)}`;
-        rows.push([m.month, 'Summary', esc(summaryDesc), '', m.closingTotal.toFixed(2)]);
+        rows.push([monthLabel, 'Summary', esc(summaryDesc), '', m.closingTotal.toFixed(2)]);
 
         // BT Actions
         if (m.btActions) {
             m.btActions.forEach(bt => {
                 const desc = `Transfer ${bt.amount.toFixed(2)} from ${bt.sourceCard} to ${bt.destinationCard} (Fee: ${bt.fee.toFixed(2)})`;
                 rows.push([
-                    m.month, 
+                    monthLabel, 
                     'Balance Transfer', 
                     esc(desc), 
                     '', 
@@ -215,7 +216,7 @@ function downloadCSV(simResults) {
         Object.keys(groups).forEach(gName => {
             const g = groups[gName];
             if (g.totalPayment > 0.005 || g.totalBalance > 0.005) {
-                rows.push([m.month, esc(gName), 'Monthly Payment', g.totalPayment.toFixed(2), g.totalBalance.toFixed(2)]);
+                rows.push([monthLabel, esc(gName), 'Monthly Payment', g.totalPayment.toFixed(2), g.totalBalance.toFixed(2)]);
             }
         });
     });
@@ -247,7 +248,9 @@ function renderReport(simResults) {
     simResults.months.forEach(m => {
         const header = document.createElement('tr');
         header.className = 'bg-slate-50 dark:bg-slate-700';
-        let headerContent = `<td class="p-3 font-bold">Month ${m.month}</td><td class="p-3" colspan="2">Total Interest: ${formatCurrency(m.interest)}`;
+        const dateDisplay = m.label ? `${m.label} (M${m.month})` : `Month ${m.month}`;
+        
+        let headerContent = `<td class="p-3 font-bold">${dateDisplay}</td><td class="p-3" colspan="2">Total Interest: ${formatCurrency(m.interest)}`;
         if (m.windfall > 0) {
             headerContent += ` <span class="text-green-500 font-bold">(+${formatCurrency(m.windfall)} windfall)</span>`;
         }
@@ -500,6 +503,11 @@ function wireControls(debouncedUpdate) {
                 setTimeout(() => { shareCleanBtn.innerHTML = originalText; }, 2000);
              });
         });
+    }
+    
+    const calendarModeEl = document.getElementById('use-calendar-mode');
+    if (calendarModeEl) {
+        calendarModeEl.addEventListener('change', debouncedUpdate);
     }
 
     // Extract Scenario Button
