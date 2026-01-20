@@ -5,7 +5,11 @@
   "private": true,
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/engine.test.js"
+    "test": "node tests/test.js",
+    "tw": "tailwindcss -i ./css/input.css -o ./css/style.css --watch"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  }
 }

@@ -11,6 +11,11 @@ export function calculateMonthlyInterest(balance, aprPercent) {
     return (balance || 0) * ((aprPercent || 0) / 100) / 12;
 }
 
+export function calculateSafetyFloor(monthlyInterest) {
+    // FCA: Minimum amount needed to flip the principal/interest ratio in a given month
+    return (monthlyInterest || 0) * 2 + 1;
+}
+
 export function calculateMinPayment(balance, minPayType, minPayVal, interestAmount) {
     let raw = 0;
     const val = Number(minPayVal) || 0;
@@ -97,8 +102,24 @@ export function runSimulation(state, options = {}) {
                 promoMonths: Number(s.promoMonths) || 0,
                 postPromoApr: Number(s.postPromoApr) || 0,
                 initialApr: Number(s.apr) || 0, // Store initial APR
+                interestHistory: [], // FCA: Rolling history
+                principalHistory: [], // FCA: Rolling history
+                initialPDMonths: Number(g.historicalPDMonths) || 0 // FCA: Starting state
             });
         });
+    });
+
+    // Handle initial PD history pre-loading (Assumption: If starting in PD, history was bad)
+    segs.forEach(s => {
+        if (s.initialPDMonths > 0) {
+            // Fill history with "bad" ratio (Principal 0, Interest 1) for the duration up to 18
+            const monthsToFill = Math.min(s.initialPDMonths, 18);
+            for (let i = 0; i < monthsToFill; i++) {
+                s.interestHistory.push(1);
+                s.principalHistory.push(0);
+            }
+        }
+        s.currentPDMonths = s.initialPDMonths; // FCA: Init counter
     });
 
     results.initialDailyInterest = segs.reduce((acc, s) => acc + calculateDailyInterestRate(s.apr) * s.balance, 0);
@@ -108,11 +129,33 @@ export function runSimulation(state, options = {}) {
     const btOffers = (state.btOffers || [])
         .filter(o => o.enabled !== false)
         .map(o => ({...o}));
+    
+    // Start simulation from current month if using calendar mode
+    const useCalendar = state.useCalendar !== false; // Default to true if undefined or allow explicit false? User wants toggle.
+    // Actually, let's treat it as opt-in for now to match UI check, OR default true if we want modernization.
+    // The UI checkbox defaults to unchecked in HTML. So let's respect that.
+    
+    const startDate = new Date();
+    startDate.setDate(1);
 
     let month = 0;
     while (month < maxMonths) {
         month += 1;
+        
+        let daysInMonth = 30;
+        let monthLabel = null;
 
+        if (useCalendar) {
+            // Determine actual month context for ADB days calculation
+            const currentSimDate = new Date(startDate.getFullYear(), startDate.getMonth() + (month - 1), 1);
+            daysInMonth = new Date(currentSimDate.getFullYear(), currentSimDate.getMonth() + 1, 0).getDate();
+            
+            // Format Label: "Jan 2026"
+            const mo = currentSimDate.toLocaleString('default', { month: 'short' });
+            const yr = currentSimDate.getFullYear();
+            monthLabel = `${mo} ${yr}`;
+        }
+        
         // Update APR for segments where promo period has ended
         segs.forEach(s => {
             if (s.promoMonths > 0) {
@@ -126,21 +169,28 @@ export function runSimulation(state, options = {}) {
 
         // Opening balances & accrue interest for the month
         let openingTotal = 0;
-        const interestBySeg = {};
+        let interestThisMonth = 0;
+        const interestBySeg = {}; // Used just for Min Pay calculation estimate
         const openingInfo = [];
         segs.forEach(s => {
             const openingBal = s.balance;
             openingTotal += openingBal;
-            const interest = calculateMonthlyInterest(openingBal, s.apr);
-            s.balance += interest; // Accrue interest first
+
+            // Simplified Interest Calculation: Balance * DailyRate * DaysInMonth
+            const dailyRate = calculateDailyInterestRate(s.apr);
+            const interest = openingBal * dailyRate * daysInMonth;
+            
+            s.balance += interest;
+            interestThisMonth += interest;
+            results.totalInterest += interest;
+
             interestBySeg[s.id] = interest;
             const min = calculateMinPayment(openingBal, s.minPayType, s.minPayVal, interest);
-            const minPaid = Math.min(min, s.balance); // Pay against new balance
+            const minPaid = Math.min(min, s.balance); // Pay against balance (which now includes interest)
             openingInfo.push({ id: s.id, name: s.name, groupName: s.groupName, openingBalance: openingBal, apr: s.apr, interest, minPayment: min, minPaid });
         });
         monthRecord.openingTotal = openingTotal;
-        monthRecord.interest = openingInfo.reduce((acc, i) => acc + i.interest, 0);
-        results.totalInterest += monthRecord.interest;
+        monthRecord.interest = interestThisMonth;
 
         // Calculate minimum payments and deduct them first
         let minPaymentsTotal = 0;
@@ -219,7 +269,11 @@ export function runSimulation(state, options = {}) {
                         balance: totalBtBalance,
                         apr: Number(offer.promoApr) || 0,
                         promoMonths: Number(offer.months) || 0,
-                        postPromoApr: Number(offer.postPromoApr) || 0, 
+                        postPromoApr: Number(offer.postPromoApr) || 0,
+                        interestHistory: [],
+                        principalHistory: [],
+                        currentPDMonths: 0,
+                        isPersistentDebt: false
                     });
                 }
                 offer.applied = true;
@@ -238,6 +292,36 @@ export function runSimulation(state, options = {}) {
         monthRecord.windfall = windfallThisMonth;
         remainingBudget += windfallThisMonth;
 
+        // --- Priority 2: FCA Safety Floor ---
+        // Apply extra payments to cards in Stage 2 (27+ months PD history) to meet safety floor
+        const useFcaSafety = state.fcaSafetyMode !== false; // Default to true if not specified
+        if (useFcaSafety) {
+            segs.forEach(s => {
+                // If card is already deep in PD (Stage 2: 27mo+)
+                if (s.currentPDMonths >= 18){
+                    if(remainingBudget > 0) {
+                        const interest = interestBySeg[s.id] || 0;
+                        const safetyFloor = calculateSafetyFloor(interest);
+                        const currentPaid = paymentsMap[s.id]?.minPaid || 0;
+                        
+                        if (currentPaid < safetyFloor) {
+                            const extraNeeded = safetyFloor - currentPaid;
+                            const extraToPay = Math.min(extraNeeded, s.balance, remainingBudget);
+                            
+                            if (extraToPay > 0) {
+                                s.balance = clamp(s.balance - extraToPay);
+                                remainingBudget -= extraToPay;
+                                paymentsMap[s.id].extraPaid += extraToPay;
+                            }
+                        }
+                    }
+
+                    // implement a warning here, or add a suggested action?
+                    // suggest increating budget or switching strategy
+                }
+            });
+        }
+
         // Apply strategy payments to sorted debts
         const targets = sortDebtsForStrategy(segs.filter(s => s.balance > 0), state.strategy || 'avalanche');
         for (const t of targets) {
@@ -249,21 +333,46 @@ export function runSimulation(state, options = {}) {
             paymentsMap[t.id].extraPaid += pay;
         }
 
-        // After payments, apply compounding: add monthly interest based on opening balances
-        let interestThisMonth = 0;
-        segs.forEach(s => {
-            const interest = interestBySeg[s.id] || 0;
-            // s.balance += interest; // Interest is now accrued before payments
-            interestThisMonth += interest;
-        });
 
-        // monthRecord.interest = interestThisMonth;
-        // results.totalInterest += interestThisMonth;
+        // FCA: Update Rolling History and Check Status
+        segs.forEach(s => {
+            const payInfo = paymentsMap[s.id] || { minPaid: 0, extraPaid: 0 };
+            const totalPay = payInfo.minPaid + payInfo.extraPaid;
+            const interest = interestBySeg[s.id] || 0;
+            const principalPaid = totalPay - interest;
+
+            s.interestHistory.push(interest);
+            s.principalHistory.push(principalPaid);
+
+            if (s.interestHistory.length > 18) s.interestHistory.shift();
+            if (s.principalHistory.length > 18) s.principalHistory.shift();
+
+            const totalInt = s.interestHistory.reduce((a,b)=>a+b,0);
+            const totalPrin = s.principalHistory.reduce((a,b)=>a+b,0);
+
+            // Only flag if there is history and non-zero balance (or we are just paying it off)
+            s.isPersistentDebt = (totalInt > totalPrin) && (s.balance > 0.01); 
+            if (s.isPersistentDebt) {
+                 s.currentPDMonths += 1;
+            } else {
+                 s.currentPDMonths = 0;
+            }
+        });
 
         // Capture per-segment snapshot
         monthRecord.openingSegments = openingInfo.map(i => ({ ...i }));
-        monthRecord.segments = segs.map(s => ({ id: s.id, name: s.name, balance: Number(s.balance.toFixed(2)), apr: s.apr, groupId: s.groupId, groupName: s.groupName }));
+        monthRecord.segments = segs.map(s => ({ 
+            id: s.id, 
+            name: s.name, 
+            balance: Number(s.balance.toFixed(2)), 
+            apr: s.apr, 
+            groupId: s.groupId, 
+            groupName: s.groupName,
+            pdMonths: s.currentPDMonths, // FCA Status
+            isPersistentDebt: s.isPersistentDebt // FCA Flag
+        }));
         monthRecord.payments = paymentsMap;
+        monthRecord.label = monthLabel; // Store formatted label
 
         // Closing total
         const closingTotal = segs.reduce((acc,s)=>acc + s.balance, 0);

@@ -1,6 +1,16 @@
 // State Management & Persistence
 // Serialisation/Deserialisation to URL hash
 
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function encodeState(obj) {
     try {
         const json = JSON.stringify(obj);
@@ -44,7 +54,8 @@ export function gatherStateFromDOM() {
         const name = gEl.querySelector('.group-name').value || `Card ${gi+1}`;
         const minPayType = gEl.querySelector('.min-pay-type')?.value || 'percentage_plus_interest';
         const minPayVal = Number(gEl.querySelector('.min-pay-val')?.value) || 1.0;
-        
+        const historicalPDMonths = Number(gEl.querySelector('.historical-pd-months')?.value) || 0;
+
         const segments = [];
         gEl.querySelectorAll('.segment-item').forEach((sEl, si) => {
             const hasPromo = sEl.querySelector('.segment-has-promo').checked;
@@ -58,7 +69,7 @@ export function gatherStateFromDOM() {
                 postPromoApr: hasPromo ? Number(sEl.querySelector('.segment-post-promo-apr').value) || 0 : 0,
             });
         });
-        state.groups.push({ id: gi, name, minPayType, minPayVal, segments });
+        state.groups.push({ id: gi, name, minPayType, minPayVal, historicalPDMonths, segments });
     });
 
     // Windfalls
@@ -81,7 +92,13 @@ export function gatherStateFromDOM() {
             enabled: b.querySelector('.bt-enabled').checked
         });
     });
-    
+
+    const calendarModeEl = document.getElementById('use-calendar-mode');
+    state.useCalendar = calendarModeEl ? calendarModeEl.checked : false;
+
+    const fcaSafetyEl = document.getElementById('fca-safety-mode');
+    state.fcaSafetyMode = fcaSafetyEl ? fcaSafetyEl.checked : true;
+
     state.darkMode = document.documentElement.classList.contains('dark');
     return state;
 }
@@ -98,6 +115,16 @@ export function restoreStateToDOM(state) {
         document.getElementById('dark-mode-toggle').textContent = 'Running in Dark Mode';
     }
 
+    const calendarModeEl = document.getElementById('use-calendar-mode');
+    if (calendarModeEl) {
+        calendarModeEl.checked = state.useCalendar || false;
+    }
+
+    const fcaSafetyEl = document.getElementById('fca-safety-mode');
+    if (fcaSafetyEl) {
+        fcaSafetyEl.checked = state.fcaSafetyMode !== false;
+    }
+
     // Clear existing groups
     const container = document.getElementById('debts-container');
     container.innerHTML = '';
@@ -112,6 +139,10 @@ export function restoreStateToDOM(state) {
         if (typeSel) typeSel.value = g.minPayType || 'percentage_plus_interest';
         const valInp = el.querySelector('.min-pay-val');
         if (valInp) valInp.value = g.minPayVal || 1.0;
+
+        // Restore PD history
+        const pdInp = el.querySelector('.historical-pd-months');
+        if (pdInp) pdInp.value = g.historicalPDMonths || 0;
 
         const segContainer = el.querySelector('.segments-container');
         const segTemplate = document.getElementById('segment-template');
@@ -144,11 +175,11 @@ export function restoreStateToDOM(state) {
             <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Month</label>
-                    <input type="number" class="windfall-month w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${w.month || ''}">
+                    <input type="number" class="windfall-month w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(w.month)}">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Amount</label>
-                    <input type="number" class="windfall-amount w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${w.amount || ''}">
+                    <input type="number" class="windfall-amount w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(w.amount)}">
                 </div>
             </div>
         `;
@@ -165,7 +196,7 @@ export function restoreStateToDOM(state) {
         const isEnabled = bt.enabled !== false; // Default to true if undefined
         div.innerHTML = `
             <div class="flex justify-between items-center mb-2">
-                <input type="text" class="bt-name flex-grow p-1 text-sm font-semibold border border-transparent rounded dark:bg-slate-850 dark:border-transparent focus:border-slate-300 dark:focus:border-slate-600 mr-2" value="${bt.name || ''}" placeholder="e.g. New Card Offer">
+                <input type="text" class="bt-name flex-grow p-1 text-sm font-semibold border border-transparent rounded dark:bg-slate-850 dark:border-transparent focus:border-slate-300 dark:focus:border-slate-600 mr-2" value="${escapeHTML(bt.name)}" placeholder="e.g. New Card Offer">
                 <div class="flex items-center space-x-2">
                     <label class="flex items-center cursor-pointer">
                         <input type="checkbox" class="bt-enabled sr-only peer" ${isEnabled ? 'checked' : ''}>
@@ -177,23 +208,23 @@ export function restoreStateToDOM(state) {
             <div class="grid grid-cols-3 gap-2">
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Cap</label>
-                    <input type="number" class="bt-cap w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.cap || ''}">
+                    <input type="number" class="bt-cap w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(bt.cap)}">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Fee %</label>
-                    <input type="number" class="bt-fee w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.feePercent || ''}">
+                    <input type="number" class="bt-fee w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(bt.feePercent)}">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Promo APR</label>
-                    <input type="number" class="bt-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.promoApr || ''}">
+                    <input type="number" class="bt-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(bt.promoApr)}">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Months</label>
-                    <input type="number" class="bt-months w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.months || ''}">
+                    <input type="number" class="bt-months w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(bt.months)}">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Post-Promo APR</label>
-                    <input type="number" class="bt-post-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.postPromoApr || ''}">
+                    <input type="number" class="bt-post-promo-apr w-full p-1 text-sm border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(bt.postPromoApr)}">
                 </div>
                 <div class="col-span-3">
                     <div class="flex space-x-2 items-end">
@@ -207,7 +238,7 @@ export function restoreStateToDOM(state) {
                         </div>
                         <div class="w-1/3">
                             <label class="block text-[10px] font-bold uppercase text-slate-500 mb-1">Value</label>
-                            <input type="number" class="bt-min-pay-val w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${bt.minPayVal || 1.0}">
+                            <input type="number" class="bt-min-pay-val w-full p-1 text-xs border border-slate-300 rounded dark:bg-slate-700 dark:border-slate-600" value="${escapeHTML(bt.minPayVal)}">
                         </div>
                     </div>
                 </div>
