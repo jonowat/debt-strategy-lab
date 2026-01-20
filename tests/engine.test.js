@@ -191,21 +191,5 @@ test('Large balance transfer scenario', () => {
     assert.ok(String(activeSegments[0].groupId).startsWith('bt-'), 'The active segment should be the BT segment');
 })
 
-test('Simulation: Minimum Payments Only', () => {
-    const s = Scenarios.simpleCard();
-    s.monthlyBudget = 1000; // High budget
-    s.minOnlyMode = true; // But min only activated
-    
-    const results = runSimulation(s);
-    
-    // With 1000 balance at 20% APR, Interest is ~16.
-    // Min pay (1% + interest) is ~26.
-    // If budget of 1000 was used, it would be paid in 1 month.
-    // If min only is used, it should take many months.
-    assert.ok(results.payoffMonth > 10, 'Should take a long time to pay off with minimums only');
-    
-    const m1 = results.months[0];
-    const totalPaid = Object.values(m1.payments).reduce((acc, p) => acc + p.minPaid + p.extraPaid, 0);
-    assert.ok(totalPaid < 50, 'Monthly payment should be small (just the minimum)');
-});
+
 

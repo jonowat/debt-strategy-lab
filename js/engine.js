@@ -11,6 +11,11 @@ export function calculateMonthlyInterest(balance, aprPercent) {
     return (balance || 0) * ((aprPercent || 0) / 100) / 12;
 }
 
+export function calculateSafetyFloor(monthlyInterest) {
+    // FCA: Minimum amount needed to flip the principal/interest ratio in a given month
+    return (monthlyInterest || 0) * 2 + 1;
+}
+
 export function calculateMinPayment(balance, minPayType, minPayVal, interestAmount) {
     let raw = 0;
     const val = Number(minPayVal) || 0;
@@ -97,8 +102,24 @@ export function runSimulation(state, options = {}) {
                 promoMonths: Number(s.promoMonths) || 0,
                 postPromoApr: Number(s.postPromoApr) || 0,
                 initialApr: Number(s.apr) || 0, // Store initial APR
+                interestHistory: [], // FCA: Rolling history
+                principalHistory: [], // FCA: Rolling history
+                initialPDMonths: Number(g.historicalPDMonths) || 0 // FCA: Starting state
             });
         });
+    });
+
+    // Handle initial PD history pre-loading (Assumption: If starting in PD, history was bad)
+    segs.forEach(s => {
+        if (s.initialPDMonths > 0) {
+            // Fill history with "bad" ratio (Principal 0, Interest 1) for the duration up to 18
+            const monthsToFill = Math.min(s.initialPDMonths, 18);
+            for (let i = 0; i < monthsToFill; i++) {
+                s.interestHistory.push(1);
+                s.principalHistory.push(0);
+            }
+        }
+        s.currentPDMonths = s.initialPDMonths; // FCA: Init counter
     });
 
     results.initialDailyInterest = segs.reduce((acc, s) => acc + calculateDailyInterestRate(s.apr) * s.balance, 0);
@@ -248,7 +269,11 @@ export function runSimulation(state, options = {}) {
                         balance: totalBtBalance,
                         apr: Number(offer.promoApr) || 0,
                         promoMonths: Number(offer.months) || 0,
-                        postPromoApr: Number(offer.postPromoApr) || 0, 
+                        postPromoApr: Number(offer.postPromoApr) || 0,
+                        interestHistory: [],
+                        principalHistory: [],
+                        currentPDMonths: 0,
+                        isPersistentDebt: false
                     });
                 }
                 offer.applied = true;
@@ -267,6 +292,36 @@ export function runSimulation(state, options = {}) {
         monthRecord.windfall = windfallThisMonth;
         remainingBudget += windfallThisMonth;
 
+        // --- Priority 2: FCA Safety Floor ---
+        // Apply extra payments to cards in Stage 2 (27+ months PD history) to meet safety floor
+        const useFcaSafety = state.fcaSafetyMode !== false; // Default to true if not specified
+        if (useFcaSafety) {
+            segs.forEach(s => {
+                // If card is already deep in PD (Stage 2: 27mo+)
+                if (s.currentPDMonths >= 27){
+                    if(remainingBudget > 0) {
+                        const interest = interestBySeg[s.id] || 0;
+                        const safetyFloor = calculateSafetyFloor(interest);
+                        const currentPaid = paymentsMap[s.id]?.minPaid || 0;
+                        
+                        if (currentPaid < safetyFloor) {
+                            const extraNeeded = safetyFloor - currentPaid;
+                            const extraToPay = Math.min(extraNeeded, s.balance, remainingBudget);
+                            
+                            if (extraToPay > 0) {
+                                s.balance = clamp(s.balance - extraToPay);
+                                remainingBudget -= extraToPay;
+                                paymentsMap[s.id].extraPaid += extraToPay;
+                            }
+                        }
+                    }
+
+                    // implement a warning here, or add a suggested action?
+                    // suggest increating budget or switching strategy
+                }
+            });
+        }
+
         // Apply strategy payments to sorted debts
         const targets = sortDebtsForStrategy(segs.filter(s => s.balance > 0), state.strategy || 'avalanche');
         for (const t of targets) {
@@ -279,13 +334,43 @@ export function runSimulation(state, options = {}) {
         }
 
 
-        // After payments, apply compounding: Simple Interest based on Days in Month
-        // Snapshots and month records are already mostly set.
-        // monthRecord.interest and results.totalInterest were updated at the start of the month loop.
+        // FCA: Update Rolling History and Check Status
+        segs.forEach(s => {
+            const payInfo = paymentsMap[s.id] || { minPaid: 0, extraPaid: 0 };
+            const totalPay = payInfo.minPaid + payInfo.extraPaid;
+            const interest = interestBySeg[s.id] || 0;
+            const principalPaid = totalPay - interest;
+
+            s.interestHistory.push(interest);
+            s.principalHistory.push(principalPaid);
+
+            if (s.interestHistory.length > 18) s.interestHistory.shift();
+            if (s.principalHistory.length > 18) s.principalHistory.shift();
+
+            const totalInt = s.interestHistory.reduce((a,b)=>a+b,0);
+            const totalPrin = s.principalHistory.reduce((a,b)=>a+b,0);
+
+            // Only flag if there is history and non-zero balance (or we are just paying it off)
+            s.isPersistentDebt = (totalInt > totalPrin) && (s.balance > 0.01); 
+            if (s.isPersistentDebt) {
+                 s.currentPDMonths += 1;
+            } else {
+                 s.currentPDMonths = 0;
+            }
+        });
 
         // Capture per-segment snapshot
         monthRecord.openingSegments = openingInfo.map(i => ({ ...i }));
-        monthRecord.segments = segs.map(s => ({ id: s.id, name: s.name, balance: Number(s.balance.toFixed(2)), apr: s.apr, groupId: s.groupId, groupName: s.groupName }));
+        monthRecord.segments = segs.map(s => ({ 
+            id: s.id, 
+            name: s.name, 
+            balance: Number(s.balance.toFixed(2)), 
+            apr: s.apr, 
+            groupId: s.groupId, 
+            groupName: s.groupName,
+            pdMonths: s.currentPDMonths, // FCA Status
+            isPersistentDebt: s.isPersistentDebt // FCA Flag
+        }));
         monthRecord.payments = paymentsMap;
         monthRecord.label = monthLabel; // Store formatted label
 

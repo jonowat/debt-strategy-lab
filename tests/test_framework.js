@@ -1,4 +1,5 @@
 
+import assert from 'assert';
 import fs from 'fs';
 import path from 'path';
 
@@ -94,7 +95,19 @@ function filterAndRunTests() {
 
 }
 
-export { test, summarize, filterAndRunTests };
+const is = {
+    approxEqual: (a, b, msg) => assert(Math.abs(a - b) <= tol, stringFormat(msg || `Expected {0} to be approximately equal to {1}`, [a, b])),
+    greaterThan: (a, b, msg) => assert(a > b, stringFormat(msg || `Expected {0} to be greater than {1}`, [a, b])),
+    lessThan: (a, b, msg) => assert(a < b, stringFormat(msg || `Expected {0} to be less than {1}`, [a, b])),
+}
+
+function stringFormat(string, args) {
+    return string.replace(/{(\d+)}/g, (match, number) => 
+        typeof args[number] !== 'undefined' ? args[number] : match
+    );
+}
+
+export { test, summarize, filterAndRunTests, is };
 // --- Test Objects / Factories ---
 
 

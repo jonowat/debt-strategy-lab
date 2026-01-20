@@ -44,7 +44,8 @@ export function gatherStateFromDOM() {
         const name = gEl.querySelector('.group-name').value || `Card ${gi+1}`;
         const minPayType = gEl.querySelector('.min-pay-type')?.value || 'percentage_plus_interest';
         const minPayVal = Number(gEl.querySelector('.min-pay-val')?.value) || 1.0;
-        
+        const historicalPDMonths = Number(gEl.querySelector('.historical-pd-months')?.value) || 0;
+
         const segments = [];
         gEl.querySelectorAll('.segment-item').forEach((sEl, si) => {
             const hasPromo = sEl.querySelector('.segment-has-promo').checked;
@@ -58,7 +59,7 @@ export function gatherStateFromDOM() {
                 postPromoApr: hasPromo ? Number(sEl.querySelector('.segment-post-promo-apr').value) || 0 : 0,
             });
         });
-        state.groups.push({ id: gi, name, minPayType, minPayVal, segments });
+        state.groups.push({ id: gi, name, minPayType, minPayVal, historicalPDMonths, segments });
     });
 
     // Windfalls
@@ -85,6 +86,9 @@ export function gatherStateFromDOM() {
     const calendarModeEl = document.getElementById('use-calendar-mode');
     state.useCalendar = calendarModeEl ? calendarModeEl.checked : false;
 
+    const fcaSafetyEl = document.getElementById('fca-safety-mode');
+    state.fcaSafetyMode = fcaSafetyEl ? fcaSafetyEl.checked : true;
+
     state.darkMode = document.documentElement.classList.contains('dark');
     return state;
 }
@@ -106,6 +110,11 @@ export function restoreStateToDOM(state) {
         calendarModeEl.checked = state.useCalendar || false;
     }
 
+    const fcaSafetyEl = document.getElementById('fca-safety-mode');
+    if (fcaSafetyEl) {
+        fcaSafetyEl.checked = state.fcaSafetyMode !== false;
+    }
+
     // Clear existing groups
     const container = document.getElementById('debts-container');
     container.innerHTML = '';
@@ -120,6 +129,10 @@ export function restoreStateToDOM(state) {
         if (typeSel) typeSel.value = g.minPayType || 'percentage_plus_interest';
         const valInp = el.querySelector('.min-pay-val');
         if (valInp) valInp.value = g.minPayVal || 1.0;
+
+        // Restore PD history
+        const pdInp = el.querySelector('.historical-pd-months');
+        if (pdInp) pdInp.value = g.historicalPDMonths || 0;
 
         const segContainer = el.querySelector('.segments-container');
         const segTemplate = document.getElementById('segment-template');

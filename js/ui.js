@@ -125,6 +125,33 @@ function updateChart(simResults) {
         fill: false,
         hidden: existingTotalDs ? existingTotalDs.hidden : false
     });
+
+    // FCA Risk Overlay (as a hidden line with point colors/radius to show risk zones)
+    const hasRisk = simResults.months.some(m => m.segments.some(s => s.pdMonths >= 18));
+    if (hasRisk) {
+        newDatasets.unshift({
+            label: 'FCA Risk Zone',
+            data: totalData.map((v, i) => {
+                const m = simResults.months[i];
+                const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
+                return maxPd >= 18 ? v : null;
+            }),
+            borderColor: 'transparent',
+            pointBackgroundColor: simResults.months.map(m => {
+                const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
+                if (maxPd >= 36) return '#ef4444'; // Red
+                if (maxPd >= 18) return '#f59e0b'; // Amber
+                return 'transparent';
+            }),
+            pointRadius: simResults.months.map(m => {
+                 const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
+                 return maxPd >= 18 ? 4 : 0;
+            }),
+            fill: false,
+            showLine: false
+        });
+    }
+
     chart.data.datasets = newDatasets;
     chart.update('none');
 
@@ -324,9 +351,21 @@ function renderReport(simResults) {
             // Only show groups that were active this month
             if (g.opening < 0.01 && g.closing < 0.01 && g.totalPayment < 0.01) return;
 
+            // FCA: Check for risk status
+            const groupSegs = m.segments.filter(s => (s.groupName || s.groupId) === gName);
+            const maxPd = Math.max(0, ...groupSegs.map(s => s.pdMonths || 0));
+            let badge = '';
+            if (maxPd >= 36) {
+                badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full border border-red-200">STAGE 3</span>`;
+            } else if (maxPd >= 27) {
+                badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full border border-orange-200">STAGE 2</span>`;
+            } else if (maxPd >= 18) {
+                badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-600 rounded-full border border-amber-200">STAGE 1</span>`;
+            }
+
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="p-3 pl-6">${gName}</td>
+                <td class="p-3 pl-6">${gName}${badge}</td>
                 <td class="p-3">
                     <div class="font-bold text-lg">${formatCurrency(g.totalPayment)}</div>
                     <div class="text-xs text-slate-500">Min: ${formatCurrency(g.min)} | Extra: ${formatCurrency(g.extra)}</div>
@@ -508,6 +547,11 @@ function wireControls(debouncedUpdate) {
     const calendarModeEl = document.getElementById('use-calendar-mode');
     if (calendarModeEl) {
         calendarModeEl.addEventListener('change', debouncedUpdate);
+    }
+
+    const fcaSafetyEl = document.getElementById('fca-safety-mode');
+    if (fcaSafetyEl) {
+        fcaSafetyEl.addEventListener('change', debouncedUpdate);
     }
 
     // Extract Scenario Button
@@ -845,8 +889,52 @@ export const ui = {
             updateChart(sim);
             renderReport(sim);
             updateQuickDetails(sim);
+            if(state.fcaSafetyMode) updateFcaWarnings(sim); // New function to handle FCA notifications
             serializeToURL(state);
         }
+
+        function updateFcaWarnings(simResults) {
+            const container = document.getElementById('fca-warning-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            const risks = []; // { name, month, stage, monthLabel }
+            const seen = new Set();
+
+            simResults.months.forEach(m => {
+                m.segments.forEach(s => {
+                    const gName = s.groupName || 'Card';
+                    [18, 27, 36].forEach(stage => {
+                        const key = `${gName}-${stage}`;
+                        if (s.pdMonths === stage && !seen.has(key)) {
+                            risks.push({ name: gName, month: m.month, monthLabel: m.label, stage });
+                            seen.add(key);
+                        }
+                    });
+                });
+            });
+
+            if (risks.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            risks.sort((a,b) => a.month - b.month).slice(0, 3).forEach(risk => {
+                const div = document.createElement('div');
+                const isCritical = risk.stage === 36;
+                div.className = `p-2 rounded text-[11px] border ${isCritical ? 'bg-red-50 text-red-800 border-red-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`;
+                
+                let msg = '';
+                if (risk.stage === 18) msg = `<strong>FCA Stage 1:</strong> <u>${risk.name}</u> will trigger a Persistent Debt warning in <strong>${risk.monthLabel || ("month " + risk.month)}</strong>.`;
+                if (risk.stage === 27) msg = `<strong>FCA Stage 2:</strong> <u>${risk.name}</u> is nearing suspension in <strong>${risk.monthLabel || ("month " + risk.month)}</strong>.`;
+                if (risk.stage === 36) msg = `<strong>Critical:</strong> <u>${risk.name}</u> triggers Stage 3 in <strong>${risk.monthLabel || ("month " + risk.month)}</strong>. Lender intervention is expected.`;
+                
+                div.innerHTML = msg;
+                container.appendChild(div);
+            });
+        }
+
 
         const debouncedUpdate = debounce(updateApplication, 300);
 
