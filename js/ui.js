@@ -7,6 +7,16 @@ import { serializeToURL, gatherStateFromDOM, restoreStateToDOM, deserializeFromU
 let chart = null;
 let costChart = null;
 
+function escapeHTML(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function debounce(func, delay) {
     let timeout;
     return function(...args) {
@@ -277,7 +287,7 @@ function renderReport(simResults, state) {
     simResults.months.forEach(m => {
         const header = document.createElement('tr');
         header.className = 'bg-slate-50 dark:bg-slate-700';
-        const dateDisplay = m.label ? `${m.label} (M${m.month})` : `Month ${m.month}`;
+        const dateDisplay = m.label ? `${escapeHTML(m.label)} (M${m.month})` : `Month ${m.month}`;
         
         let headerContent = `<td class="p-3 font-bold">${dateDisplay}</td><td class="p-3" colspan="2">Total Interest: ${formatCurrency(m.interest)}`;
         if (m.windfall > 0) {
@@ -312,7 +322,7 @@ function renderReport(simResults, state) {
             });
 
             Object.values(consolidatedActions).forEach(action => {
-                btHtml += `<li>Transfer ${formatCurrency(action.totalAmount)} from ${action.sourceCard} to ${action.destinationCard}. New balance on BT card: ${formatCurrency(action.totalNewBalance)} (incl. ${formatCurrency(action.totalFee)} fee).</li>`;
+                btHtml += `<li>Transfer ${formatCurrency(action.totalAmount)} from ${escapeHTML(action.sourceCard)} to ${escapeHTML(action.destinationCard)}. New balance on BT card: ${formatCurrency(action.totalNewBalance)} (incl. ${formatCurrency(action.totalFee)} fee).</li>`;
             });
             
             btHtml += '</ul></td>';
@@ -369,7 +379,7 @@ function renderReport(simResults, state) {
 
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="p-3 pl-6">${gName}${badge}</td>
+                <td class="p-3 pl-6">${escapeHTML(gName)}${badge}</td>
                 <td class="p-3">
                     <div class="font-bold text-lg">${formatCurrency(g.totalPayment)}</div>
                     <div class="text-xs text-slate-500">Min: ${formatCurrency(g.min)} | Extra: ${formatCurrency(g.extra)}</div>
@@ -946,10 +956,12 @@ export const ui = {
                 const isCritical = risk.stage === 36;
                 div.className = `p-2 rounded text-[11px] border ${isCritical ? 'bg-red-50 text-red-800 border-red-200' : 'bg-amber-50 text-amber-800 border-amber-200'}`;
                 
+                const safeName = escapeHTML(risk.name);
+                const safeLabel = escapeHTML(risk.monthLabel || ("month " + risk.month));
                 let msg = '';
-                if (risk.stage === 18) msg = `<strong>FCA Stage 1:</strong> <u>${risk.name}</u> will trigger a Persistent Debt warning in <strong>${risk.monthLabel || ("month " + risk.month)}</strong>.`;
-                if (risk.stage === 27) msg = `<strong>FCA Stage 2:</strong> <u>${risk.name}</u> is nearing suspension in <strong>${risk.monthLabel || ("month " + risk.month)}</strong>.`;
-                if (risk.stage === 36) msg = `<strong>Critical:</strong> <u>${risk.name}</u> triggers Stage 3 in <strong>${risk.monthLabel || ("month " + risk.month)}</strong>. Lender intervention is expected.`;
+                if (risk.stage === 18) msg = `<strong>FCA Stage 1:</strong> <u>${safeName}</u> will trigger a Persistent Debt warning in <strong>${safeLabel}</strong>.`;
+                if (risk.stage === 27) msg = `<strong>FCA Stage 2:</strong> <u>${safeName}</u> is nearing suspension in <strong>${safeLabel}</strong>.`;
+                if (risk.stage === 36) msg = `<strong>Critical:</strong> <u>${safeName}</u> triggers Stage 3 in <strong>${safeLabel}</strong>. Lender intervention is expected.`;
                 
                 div.innerHTML = msg;
                 container.appendChild(div);
