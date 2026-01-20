@@ -5,28 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Debt Strategy Lab</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        slate: { 850: '#1e293b' } 
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        /* Custom styles for print and specific components */
-        @media print {
-            body { background-color: white; color: black; }
-            .no-print { display: none; }
-            .print-only { display: block; }
-        }
-        .group-card { border-left: 4px solid #6366f1; }
-    </style>
+    <link href="./css/style.css" rel="stylesheet">
 </head>
 <body class="text-slate-900 dark:text-slate-100 min-h-screen flex flex-col bg-slate-50 dark:bg-slate-900 transition-colors duration-100">
 

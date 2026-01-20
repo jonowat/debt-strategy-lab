@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {  
+    --color-slate-850: #1e293b;
+}
+        /* Custom styles for print and specific components */
+@media print {
+    body { background-color: white; color: black; }
+    .no-print { display: none; }
+    .print-only { display: block; }
+}
+.group-card { border-left: 4px solid #6366f1; }
