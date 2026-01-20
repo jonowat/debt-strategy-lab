@@ -71,7 +71,7 @@ function initChart() {
 
 }
 
-function updateChart(simResults) {
+function updateChart(simResults, state) {
     if (!chart || !costChart) return;
     if (!simResults || !simResults.months) {
         chart.data.labels = [];
@@ -126,32 +126,34 @@ function updateChart(simResults) {
         hidden: existingTotalDs ? existingTotalDs.hidden : false
     });
 
-    // FCA Risk Overlay (as a hidden line with point colors/radius to show risk zones)
-    const hasRisk = simResults.months.some(m => m.segments.some(s => s.pdMonths >= 18));
-    if (hasRisk) {
-        newDatasets.unshift({
-            label: 'FCA Risk Zone',
-            data: totalData.map((v, i) => {
-                const m = simResults.months[i];
-                const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
-                return maxPd >= 18 ? v : null;
-            }),
-            borderColor: 'transparent',
-            pointBackgroundColor: simResults.months.map(m => {
-                const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
-                if (maxPd >= 36) return '#ef4444'; // Red
-                if (maxPd >= 18) return '#f59e0b'; // Amber
-                return 'transparent';
-            }),
-            pointRadius: simResults.months.map(m => {
-                 const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
-                 return maxPd >= 18 ? 4 : 0;
-            }),
-            fill: false,
-            showLine: false
-        });
+    if(state.fcaSafetyMode) {
+        // FCA Risk Overlay (as a hidden line with point colors/radius to show risk zones)
+        const hasRisk = simResults.months.some(m => m.segments.some(s => s.pdMonths >= 18));
+        if (hasRisk) {
+            newDatasets.unshift({
+                label: 'FCA Risk Zone',
+                data: totalData.map((v, i) => {
+                    const m = simResults.months[i];
+                    const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
+                    return maxPd >= 18 ? v : null;
+                }),
+                borderColor: 'transparent',
+                pointBackgroundColor: simResults.months.map(m => {
+                    const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
+                    if (maxPd >= 36) return '#ef4444'; // Red
+                    if (maxPd >= 18) return '#f59e0b'; // Amber
+                    return 'transparent';
+                }),
+                pointRadius: simResults.months.map(m => {
+                    const maxPd = Math.max(0, ...m.segments.map(s => s.pdMonths || 0));
+                    return maxPd >= 18 ? 4 : 0;
+                }),
+                fill: false,
+                showLine: false
+            });
+        }
     }
-
+    
     chart.data.datasets = newDatasets;
     chart.update('none');
 
@@ -260,7 +262,7 @@ function downloadCSV(simResults) {
     document.body.removeChild(link);
 }
 
-function renderReport(simResults) {
+function renderReport(simResults, state) {
     const section = document.getElementById('report-section');
     const tbody = document.getElementById('report-table-body');
     const payoffDisplay = document.getElementById('payoff-date-display');
@@ -351,16 +353,18 @@ function renderReport(simResults) {
             // Only show groups that were active this month
             if (g.opening < 0.01 && g.closing < 0.01 && g.totalPayment < 0.01) return;
 
-            // FCA: Check for risk status
-            const groupSegs = m.segments.filter(s => (s.groupName || s.groupId) === gName);
-            const maxPd = Math.max(0, ...groupSegs.map(s => s.pdMonths || 0));
             let badge = '';
-            if (maxPd >= 36) {
-                badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full border border-red-200">STAGE 3</span>`;
-            } else if (maxPd >= 27) {
-                badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full border border-orange-200">STAGE 2</span>`;
-            } else if (maxPd >= 18) {
-                badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-600 rounded-full border border-amber-200">STAGE 1</span>`;
+            if(state.fcaSafetyMode) {
+                // FCA: Check for risk status
+                const groupSegs = m.segments.filter(s => (s.groupName || s.groupId) === gName);
+                const maxPd = Math.max(0, ...groupSegs.map(s => s.pdMonths || 0));
+                if (maxPd >= 36) {
+                    badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-red-100 text-red-700 rounded-full border border-red-200">STAGE 3</span>`;
+                } else if (maxPd >= 27) {
+                    badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-orange-100 text-orange-700 rounded-full border border-orange-200">STAGE 2</span>`;
+                } else if (maxPd >= 18) {
+                    badge = `<span class="ml-2 px-1.5 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-600 rounded-full border border-amber-200">STAGE 1</span>`;
+                }
             }
 
             const tr = document.createElement('tr');
@@ -551,7 +555,17 @@ function wireControls(debouncedUpdate) {
 
     const fcaSafetyEl = document.getElementById('fca-safety-mode');
     if (fcaSafetyEl) {
-        fcaSafetyEl.addEventListener('change', debouncedUpdate);
+        fcaSafetyEl.addEventListener('change', () => {
+            const visible = fcaSafetyEl.checked;
+            document.querySelectorAll('.fca-history-controls').forEach(el => {
+                el.classList.toggle('hidden', !visible);
+            });
+            // Also hide the global warnings if disabled
+            const warnings = document.getElementById('fca-warning-container');
+            if (warnings && !visible) warnings.classList.add('hidden');
+            
+            debouncedUpdate();
+        });
     }
 
     // Extract Scenario Button
@@ -770,6 +784,13 @@ function setupGroupElement(el, debouncedUpdate) {
     const color = `hsl(${(groupIndex * 70) % 360}, 70%, 50%)`;
     el.style.borderColor = color;
 
+    // Initialize visibility of FCA controls
+    const fcaSafetyEl = document.getElementById('fca-safety-mode');
+    const fcaControls = el.querySelector('.fca-history-controls');
+    if (fcaSafetyEl && fcaControls) {
+        fcaControls.classList.toggle('hidden', !fcaSafetyEl.checked);
+    }
+
     el.querySelector('.remove-group').addEventListener('click', (e) => {
         e.stopPropagation();
         el.remove();
@@ -886,8 +907,8 @@ export const ui = {
                 recEl.classList.add('hidden');
             }
 
-            updateChart(sim);
-            renderReport(sim);
+            updateChart(sim, state);
+            renderReport(sim, state);
             updateQuickDetails(sim);
             if(state.fcaSafetyMode) updateFcaWarnings(sim); // New function to handle FCA notifications
             serializeToURL(state);

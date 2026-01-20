@@ -298,7 +298,7 @@ export function runSimulation(state, options = {}) {
         if (useFcaSafety) {
             segs.forEach(s => {
                 // If card is already deep in PD (Stage 2: 27mo+)
-                if (s.currentPDMonths >= 27){
+                if (s.currentPDMonths >= 18){
                     if(remainingBudget > 0) {
                         const interest = interestBySeg[s.id] || 0;
                         const safetyFloor = calculateSafetyFloor(interest);
