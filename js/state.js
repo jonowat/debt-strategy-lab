@@ -55,6 +55,8 @@ export function gatherStateFromDOM() {
         const minPayType = gEl.querySelector('.min-pay-type')?.value || 'percentage_plus_interest';
         const minPayVal = Number(gEl.querySelector('.min-pay-val')?.value) || 1.0;
         const historicalPDMonths = Number(gEl.querySelector('.historical-pd-months')?.value) || 0;
+        const priorityBtn = gEl.querySelector('.tsunami-priority-btn');
+        const priority = (priorityBtn && priorityBtn.classList.contains('text-amber-500')) ? 1 : 999;
 
         const segments = [];
         gEl.querySelectorAll('.segment-item').forEach((sEl, si) => {
@@ -67,9 +69,10 @@ export function gatherStateFromDOM() {
                 hasPromo: hasPromo,
                 promoMonths: hasPromo ? Number(sEl.querySelector('.segment-promo-months').value) || 0 : 0,
                 postPromoApr: hasPromo ? Number(sEl.querySelector('.segment-post-promo-apr').value) || 0 : 0,
+                priority: priority // Propagate priority to segments
             });
         });
-        state.groups.push({ id: gi, name, minPayType, minPayVal, historicalPDMonths, segments });
+        state.groups.push({ id: gi, name, minPayType, minPayVal, historicalPDMonths, priority, segments });
     });
 
     // Windfalls
@@ -134,6 +137,13 @@ export function restoreStateToDOM(state) {
         const el = clone.querySelector('.group-item');
         el.querySelector('.group-name').value = g.name || '';
         
+        // Restore Priority (Star)
+        const priorityBtn = el.querySelector('.tsunami-priority-btn');
+        if (priorityBtn && g.priority === 1) {
+            priorityBtn.classList.add('text-amber-500');
+            priorityBtn.classList.remove('text-slate-300');
+        }
+
         // Restore min pay settings
         const typeSel = el.querySelector('.min-pay-type');
         if (typeSel) typeSel.value = g.minPayType || 'percentage_plus_interest';

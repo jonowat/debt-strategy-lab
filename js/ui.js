@@ -98,6 +98,25 @@ function updateChart(simResults, state) {
     // One dataset for total
     const totalData = simResults.months.map(m => Number(m.closingTotal.toFixed(2)));
     chart.data.labels = months;
+
+    const newDatasets = [];
+
+    // Ghost Line (Baseline: Bank Minimums)
+    const baselineState = JSON.parse(JSON.stringify(state));
+    baselineState.monthlyBudget = 0; // Forced min only
+    const baselineSim = runSimulation(baselineState, { maxMonths: 600 });
+    const baselineData = baselineSim.months.map(m => Number(m.closingTotal.toFixed(2)));
+    
+    newDatasets.push({
+        label: 'Bank Minimums (Baseline)',
+        data: baselineData,
+        borderColor: '#94a3b8',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        fill: false,
+        pointRadius: 0
+    });
+
     // Build per-group series
     const groupMap = {};
     simResults.months.forEach(month => {
@@ -108,7 +127,7 @@ function updateChart(simResults, state) {
     });
 
     const existingDatasets = chart.data.datasets;
-    const newDatasets = [];
+    //const newDatasets = [];
 
     Object.keys(groupMap).forEach((gName, gi) => {
         const data = simResults.months.map(m => {
@@ -400,6 +419,36 @@ function renderReport(simResults, state) {
         csvBtn.parentNode.replaceChild(newBtn, csvBtn);
         newBtn.addEventListener('click', () => downloadCSV(simResults));
     }
+
+    // Check if expansion button is needed
+    const container = document.getElementById('action-plan-container');
+    const overlay = document.getElementById('action-plan-overlay');
+    const toggleBtnCont = document.getElementById('toggle-action-plan-btn')?.parentElement;
+    
+    if (container && overlay && toggleBtnCont) {
+        const isExpanded = container.classList.contains('max-h-none');
+        // Temporarily restrict to check scrollHeight
+        container.classList.remove('max-h-none');
+        container.classList.add('max-h-[400px]');
+        
+        const needsExpansion = container.scrollHeight > 400;
+        
+        if (!needsExpansion) {
+            overlay.classList.add('hidden');
+            toggleBtnCont.classList.add('hidden');
+            container.classList.remove('max-h-[400px]');
+            container.classList.add('max-h-none');
+        } else {
+            toggleBtnCont.classList.remove('hidden');
+            if (isExpanded) {
+                container.classList.remove('max-h-[400px]');
+                container.classList.add('max-h-none');
+                overlay.classList.add('hidden');
+            } else {
+                overlay.classList.remove('hidden');
+            }
+        }
+    }
 }
 
 function validateBudgetAndToggleWarning() {
@@ -530,6 +579,59 @@ function wireControls(debouncedUpdate) {
             const footer = document.getElementById('disclaimer');
             if (footer) {
                 footer.scrollIntoView({ behavior: 'smooth' });
+            }
+        });
+    }
+
+    // Open Strategy Lab Button
+    const openLabBtn = document.getElementById('open-strategy-lab-btn');
+    if (openLabBtn) {
+        openLabBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const labSection = document.getElementById('strategy-lab-section');
+            if (labSection) {
+                const isHidden = labSection.classList.contains('hidden');
+                
+                if (isHidden) {
+                    labSection.classList.remove('hidden');
+                    openLabBtn.innerHTML = `Hide Comparison <svg class="w-3 h-3 ml-1 rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>`;
+                } else {
+                    labSection.classList.add('hidden');
+                    openLabBtn.innerHTML = `Compare Strategies <svg class="w-3 h-3 ml-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>`;
+                }
+
+                if (!isHidden) return; // Don't scroll if we just closed it
+
+                labSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Brief highlight
+                labSection.classList.add('ring-4', 'ring-indigo-400', 'ring-opacity-50', 'transition-all', 'duration-1000');
+                setTimeout(() => {
+                    labSection.classList.remove('ring-4', 'ring-indigo-400', 'ring-opacity-50');
+                }, 2000);
+            }
+        });
+    }
+
+    // Action Plan Expansion Toggle
+    const togglePlanBtn = document.getElementById('toggle-action-plan-btn');
+    if (togglePlanBtn) {
+        togglePlanBtn.addEventListener('click', () => {
+            const container = document.getElementById('action-plan-container');
+            const overlay = document.getElementById('action-plan-overlay');
+            const isExpanded = container.classList.contains('max-h-none');
+
+            if (isExpanded) {
+                container.classList.remove('max-h-none');
+                container.classList.add('max-h-[400px]');
+                overlay.classList.remove('hidden');
+                togglePlanBtn.querySelector('span').textContent = 'Show Full Action Plan';
+                togglePlanBtn.querySelector('svg').classList.remove('rotate-180');
+            } else {
+                container.classList.remove('max-h-[400px]');
+                container.classList.add('max-h-none');
+                overlay.classList.add('hidden');
+                togglePlanBtn.querySelector('span').textContent = 'Collapse Action Plan';
+                togglePlanBtn.querySelector('svg').classList.add('rotate-180');
             }
         });
     }
@@ -794,6 +896,18 @@ function setupGroupElement(el, debouncedUpdate) {
     const color = `hsl(${(groupIndex * 70) % 360}, 70%, 50%)`;
     el.style.borderColor = color;
 
+    // Tsunami Priority (Star)
+    const priorityBtn = el.querySelector('.tsunami-priority-btn');
+    if (priorityBtn) {
+        priorityBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isStarred = priorityBtn.classList.contains('text-amber-500');
+            priorityBtn.classList.toggle('text-amber-500', !isStarred);
+            priorityBtn.classList.toggle('text-slate-300', isStarred);
+            debouncedUpdate();
+        });
+    }
+
     // Initialize visibility of FCA controls
     const fcaSafetyEl = document.getElementById('fca-safety-mode');
     const fcaControls = el.querySelector('.fca-history-controls');
@@ -862,14 +976,26 @@ function setupSegmentElement(el, debouncedUpdate) {
     el.querySelectorAll('input').forEach(inp => inp.addEventListener('input', debouncedUpdate));
 }
 
-function updateQuickDetails(sim) {
+function updateQuickDetails(sim, state
+) {
     const dailyInterestEl = document.getElementById('daily-interest');
     const payoffTimeEl = document.getElementById('payoff-time');
+    const freedomDateEl = document.getElementById('freedom-date');
     const interestSavedEl = document.getElementById('interest-saved');
+    
+    if((state.btOffers||[]).find(offer=> offer.enabled)) {
+        document.getElementById('bt-saved').classList.remove('hidden');
+    } else {
+        document.getElementById('bt-saved').classList.add('hidden');
+    }
+
+    const ratioPrincipal = document.getElementById('ratio-principal');
+    const ratioInterest = document.getElementById('ratio-interest');
 
     if (!sim) {
         dailyInterestEl.textContent = '-';
         payoffTimeEl.textContent = '-';
+        freedomDateEl.textContent = '-';
         interestSavedEl.textContent = '-';
         return;
     }
@@ -879,12 +1005,137 @@ function updateQuickDetails(sim) {
     if (sim.payoffMonth) {
         const years = Math.floor(sim.payoffMonth / 12);
         const months = sim.payoffMonth % 12;
-        payoffTimeEl.textContent = `${years > 0 ? `${years}y` : ''} ${months}m`;
+        payoffTimeEl.textContent = `${years > 0 ? `${years}yr ` : ''}${months}mo`;
+        
+        // Freedom Date calculation
+        const freedomDateObj = new Date();
+        freedomDateObj.setMonth(freedomDateObj.getMonth() + sim.payoffMonth);
+        const freedomLabel = freedomDateObj.toLocaleString('default', { month: 'short', year: 'numeric' });
+        freedomDateEl.textContent = freedomLabel;
     } else {
-        payoffTimeEl.textContent = '30y+';
+        payoffTimeEl.textContent = '';
+        freedomDateEl.textContent = '30y+';
+    }
+
+    // Interest Ratio Bar
+    if (sim.firstMonthInterestRatio !== null) {
+        const intRatio = sim.firstMonthInterestRatio * 100;
+        const prinRatio = 100 - intRatio;
+        ratioPrincipal.style.width = `${prinRatio}%`;
+        ratioInterest.style.width = `${intRatio}%`;
     }
 
     interestSavedEl.textContent = `${formatCurrency(sim.interestSavedFromBT || 0)}`;
+}
+
+function renderStrategyGallery(state, currentSim, debouncedUpdate) {
+    const comparisons = compareStrategies(state, ['avalanche', 'snowball', 'highest-interest-amount', 'tsunami', 'percentage-buffer', 'min-only']);
+    const cardsContainer = document.getElementById('strategy-cards');
+    const tableBody = document.getElementById('comparison-table-body');
+    
+    if (!cardsContainer || !tableBody) return;
+
+    cardsContainer.innerHTML = '';
+    tableBody.innerHTML = '';
+
+    const strategyMeta = {
+        'avalanche': { name: 'Avalanche', desc: 'Mathematically Optimal. Targets high APR first.', icon: '⚡' },
+        'snowball': { name: 'Snowball', desc: 'Psychological Momentum. Targets small balances first.', icon: '❄️' },
+        'highest-interest-amount': { name: 'Interest Target', desc: 'Big Spender. Targets cards costing the most NOW.', icon: '🎯' },
+        'tsunami': { name: 'Tsunami', desc: 'Emotional Release. Targets your "Starred" cards first.', icon: '🌊' },
+        'percentage-buffer': { name: 'The Buffer', desc: 'Scalable Growth. Pays Min + 10% extra.', icon: '🛡️' },
+        'min-only': { name: 'Bank Minimums', desc: 'The "Forever Debt" trap. No extra payments.', icon: '📉' }
+    };
+
+    // Render Cards (Highlight top 3 optimized ones)
+    const activeStrategies = ['avalanche', 'snowball', 'percentage-buffer'];
+    activeStrategies.forEach(stratId => {
+        const comp = comparisons.find(c => c.strategy === stratId);
+        const meta = strategyMeta[stratId];
+        const isActive = state.strategy === stratId;
+
+        const card = document.createElement('div');
+        card.className = `cursor-pointer p-4 rounded-lg border-2 transition-all relative ${isActive ? 'bg-indigo-800 border-amber-400 scale-105 shadow-lg' : 'bg-indigo-950/40 border-indigo-700 hover:border-indigo-400'}`;
+        card.innerHTML = `
+            <div class="flex items-center space-x-2 mb-2">
+                <span class="text-xl">${meta.icon}</span>
+                <button aria-label="Select ${meta.name} Strategy">
+                    <span class="font-bold text-sm uppercase tracking-wider">${meta.name}</span>
+                    <span class="inset-0 absolute"></span>
+                </button>
+            </div>
+            <p class="text-[10px] text-indigo-200 leading-tight mb-3">${meta.desc}</p>
+            <div class="flex justify-between items-end">
+                <div>
+                    <span class="block text-[8px] text-indigo-300 uppercase">Freedom</span>
+                    <span class="font-bold text-xs">${comp.freedomLabel}</span>
+                </div>
+                <div class="text-right">
+                    <span class="block text-[8px] text-indigo-300 uppercase">Motivation</span>
+                    <span class="text-xs">${"⭐".repeat(Math.ceil(comp.score / 2))}</span>
+                </div>
+            </div>
+        `;
+        card.querySelector('button')?.addEventListener('click', () => {
+             const sel = document.getElementById('strategy-select');
+             if (sel) {
+                 sel.value = stratId;
+                 debouncedUpdate();
+             }
+        });
+        cardsContainer.appendChild(card);
+    });
+
+    // Render Comparison Table
+    comparisons.sort((a,b) => a.totalInterest - b.totalInterest).forEach(comp => {
+        const meta = strategyMeta[comp.strategy];
+        const tr = document.createElement('tr');
+        const isCurrent = state.strategy === comp.strategy || (comp.strategy === 'min-only' && state.monthlyBudget <= computeRequiredMinimums(state) + 1);
+        
+        tr.className = `cursor-pointer transition-colors ${isCurrent ? 'bg-indigo-700/80 font-semibold' : 'hover:bg-indigo-800/30'}`;
+        
+        tr.addEventListener('click', () => {
+             const sel = document.getElementById('strategy-select');
+             if (sel) {
+                 sel.value = comp.strategy;
+                 debouncedUpdate();
+             }
+        });
+
+        // Freedom Date conversion
+        const fDate = new Date();
+        fDate.setMonth(fDate.getMonth() + (comp.payoffMonth || 360));
+        const fDateLabel = fDate.toLocaleString('default', { month: 'short', year: 'numeric' });
+
+        const savingsVsBaseline = comparisons.find(c => c.strategy === 'min-only').totalInterest - comp.totalInterest;
+        const valueClass = comp.score > 7 ? 'text-green-400' : (comp.score > 4 ? 'text-amber-400' : 'text-red-400');
+        const valueLabel = comp.score > 7 ? 'Best' : (comp.score > 4 ? 'Good' : 'Poor');
+
+        tr.innerHTML = `
+            <td class="p-2">
+                <div class="flex items-center space-x-1">
+                    <span>${meta.icon}</span>
+                    <div class="font-bold">${meta.name}</div>
+                </div>
+                ${comp.strategy === 'tsunami' ? '<div class="text-[8px] italic text-indigo-300">Using starred cards</div>' : ''}
+            </td>
+            <td class="p-2">
+                <div class="font-bold">${fDateLabel}</div>
+                <div class="text-[9px] opacity-70">${comp.freedomLabel}</div>
+            </td>
+            <td class="p-2">
+                <div class="font-bold">${formatCurrency(comp.totalInterest)}</div>
+                ${savingsVsBaseline > 0 ? `<div class="text-[9px] text-green-400">Save ${formatCurrency(savingsVsBaseline)}</div>` : ''}
+            </td>
+            <td class="p-2">
+                <div class="text-[9px]">Goal in ${comp.timeToFirstZero || '?'} mo</div>
+            </td>
+            <td class="p-2 text-center">
+                <span class="${valueClass} font-bold">${valueLabel}</span>
+            </td>
+        `;
+        tableBody.appendChild(tr);
+    });
 }
 
 
@@ -903,23 +1154,26 @@ export const ui = {
             const currentStrat = state.strategy;
             const recEl = document.getElementById('strategy-recommendation');
             
-            if (best && best.strategy !== currentStrat && (best.totalInterest < sim.totalInterest - 10)) {
-                // If the best strategy saves more than £10
-                const saved = sim.totalInterest - best.totalInterest;
-                const stratNames = {
-                    'avalanche': 'Avalanche',
-                    'snowball': 'Snowball',
-                    'highest-interest-amount': 'Highest Interest Amount'
-                };
-                recEl.innerHTML = `💡 <strong>Tip:</strong> Switching to <u>${stratNames[best.strategy] || best.strategy}</u> could save you an extra <strong>${formatCurrency(saved)}</strong> in interest.`;
-                recEl.classList.remove('hidden');
-            } else {
-                recEl.classList.add('hidden');
+            if (recEl) {
+                if (best && best.strategy !== currentStrat && (best.totalInterest < sim.totalInterest - 10)) {
+                    // If the best strategy saves more than £10
+                    const saved = sim.totalInterest - best.totalInterest;
+                    const stratNames = {
+                        'avalanche': 'Avalanche',
+                        'snowball': 'Snowball',
+                        'highest-interest-amount': 'Highest Interest Amount'
+                    };
+                    recEl.innerHTML = `💡 <strong>Tip:</strong> Switching to <u>${stratNames[best.strategy] || best.strategy}</u> could save you an extra <strong>${formatCurrency(saved)}</strong> in interest.`;
+                    recEl.classList.remove('hidden');
+                } else {
+                    recEl.classList.add('hidden');
+                }
             }
 
             updateChart(sim, state);
             renderReport(sim, state);
-            updateQuickDetails(sim);
+            updateQuickDetails(sim, state);
+            renderStrategyGallery(state, sim, debouncedUpdate);
             if(state.fcaSafetyMode) updateFcaWarnings(sim); // New function to handle FCA notifications
             serializeToURL(state);
         }

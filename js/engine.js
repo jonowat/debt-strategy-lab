@@ -40,37 +40,72 @@ export function calculateMinPayment(balance, minPayType, minPayVal, interestAmou
 
 function sortDebtsForStrategy(segments, strategy) {
     if (strategy === 'avalanche') {
-        const sorted = segments.sort((a, b) => (b.apr || 0) - (a.apr || 0));
+        const sorted = [...segments].sort((a, b) => (b.apr || 0) - (a.apr || 0));
         return sorted;
     }
     if (strategy === 'highest-interest-amount') {
         // Prioritize segment generating the most interest (balance * apr)
         // Helps tackle "big scary numbers" even if APR is slightly lower than highest
-        return segments.sort((a, b) => {
+        return [...segments].sort((a, b) => {
             const interestA = (a.balance || 0) * (a.apr || 0);
             const interestB = (b.balance || 0) * (b.apr || 0);
             return interestB - interestA;
         });
     }
+    if (strategy === 'tsunami') {
+        // Sort by custom priority (1 = highest priority). 
+        // We'll treat missing priority as lowest (infinity)
+        return [...segments].sort((a, b) => {
+            const pA = a.priority === undefined ? 999 : a.priority;
+            const pB = b.priority === undefined ? 999 : b.priority;
+            return pA - pB;
+        });
+    }
     // Default: snowball
-    return segments.sort((a, b) => (a.balance || 0) - (b.balance || 0));
+    return [...segments].sort((a, b) => (a.balance || 0) - (b.balance || 0));
 }
 
-export function compareStrategies(state, strategies = ['avalanche', 'snowball', 'highest-interest-amount']) {
+export function compareStrategies(state, strategies = ['avalanche', 'snowball', 'highest-interest-amount', 'tsunami', 'percentage-buffer', 'min-only']) {
     const results = [];
     strategies.forEach(strat => {
         // Clone state to avoid mutation
         const cleanState = JSON.parse(JSON.stringify(state));
-        cleanState.strategy = strat;
+        
+        if (strat === 'min-only') {
+            cleanState.monthlyBudget = 0; // Forced to minimums only
+            cleanState.strategy = 'avalanche'; // Sorting doesn't matter for min-only
+        } else if (strat === 'percentage-buffer') {
+            cleanState.strategy = 'avalanche'; // Use avalanche for the extra
+            cleanState.percentageBuffer = 0.10; // 10% extra
+        } else {
+            cleanState.strategy = strat;
+        }
+
         const sim = runSimulation(cleanState, { maxMonths: 600 });
+        
+        // Human Metrics
+        const years = Math.floor((sim.payoffMonth || 0) / 12);
+        const months = (sim.payoffMonth || 0) % 12;
+        
         results.push({
             strategy: strat,
             totalInterest: sim.totalInterest,
-            payoffMonth: sim.payoffMonth
+            payoffMonth: sim.payoffMonth,
+            freedomLabel: sim.payoffMonth ? `${years > 0 ? `${years}y ` : ''}${months}m` : '30y+',
+            timeToFirstZero: sim.timeToFirstZero || null,
+            firstMonthInterestRatio: sim.firstMonthInterestRatio || 0
         });
     });
-    // Sort by total interest ascending (best first)
-    return results.sort((a, b) => a.totalInterest - b.totalInterest);
+
+    // Strategy "Value" Scoring (Simple 1-10 based on interest savings vs baseline)
+    const baseline = results.find(r => r.strategy === 'min-only')?.totalInterest || 1;
+    results.forEach(r => {
+        const savings = baseline - r.totalInterest;
+        const score = Math.min(10, Math.max(1, Math.round((savings / baseline) * 20)));
+        r.score = score;
+    });
+
+    return results;
 }
 
 export function runSimulation(state, options = {}) {
@@ -82,7 +117,9 @@ export function runSimulation(state, options = {}) {
         payoffMonth: null,
         interestSavedFromBT: 0,
         initialBalance: 0,
-        totalFees: 0
+        totalFees: 0,
+        timeToFirstZero: null,
+        firstMonthInterestRatio: null
     };
 
     // Clone balances
@@ -282,6 +319,12 @@ export function runSimulation(state, options = {}) {
 
         // Remaining budget after minimums
         let monthlyBudget = Number(state.monthlyBudget) || 0;
+        
+        // Percentage Buffer Strategy: Override budget to be Min + X%
+        if (state.percentageBuffer) {
+            monthlyBudget = minPaymentsTotal * (1 + state.percentageBuffer);
+        }
+
         let remainingBudget = clamp(monthlyBudget - minPaymentsTotal);
         
         // Add windfall to remaining budget
@@ -379,6 +422,19 @@ export function runSimulation(state, options = {}) {
         monthRecord.closingTotal = closingTotal;
 
         results.months.push(monthRecord);
+
+        // Tracking first zero (psychological win)
+        const hasAZero = segs.some(s => s.balance <= 0.005);
+        if (hasAZero && results.timeToFirstZero === null) {
+            results.timeToFirstZero = month;
+        }
+
+        // Tracking first month interest ratio (human cost)
+        if (month === 1) {
+            const totalMonthlyInterest = monthRecord.interest;
+            const totalMonthlyPayments = Object.values(paymentsMap).reduce((acc, p) => acc + p.minPaid + p.extraPaid, 0);
+            results.firstMonthInterestRatio = totalMonthlyPayments > 0 ? (totalMonthlyInterest / totalMonthlyPayments) : 0;
+        }
 
         // Check payoff
         const allZero = segs.every(s => s.balance <= 0.005);

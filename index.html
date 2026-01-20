@@ -20,7 +20,7 @@
                 </span>
             </div>
             
-            <div class="flex items-center space-x-2">
+            <div class="flex items-center space-x-2 no-print">
                 <button id="toggle-help-btn" class="text-xs flex items-center bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-1.5 rounded transition dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-blue-300 border border-blue-200 dark:border-slate-600" title="Toggle Instructions">
                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                     Help
@@ -48,7 +48,7 @@
     <main class="flex-grow p-4 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         <!-- Intro / Instructions -->
-        <div id="instructions-panel" class="lg:col-span-12 bg-indigo-50 dark:bg-slate-800 border-l-4 border-indigo-500 p-4 rounded shadow-sm mb-2 relative">
+        <div id="instructions-panel" class="lg:col-span-12 bg-indigo-50 dark:bg-slate-800 border-l-4 border-indigo-500 p-4 rounded shadow-sm mb-2 relative print:block">
             <button id="close-instructions-btn" class="absolute top-2 right-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400" title="Hide Instructions">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
@@ -62,7 +62,7 @@
             </p>
             <details class="group">
                 <summary class="cursor-pointer text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
-                    How to use this tool (Click to expand)
+                    How to use this tool <span class="no-print">(Click to expand)</span>
                 </summary>
                 <ol class="mt-3 list-decimal list-inside text-sm text-slate-600 dark:text-slate-400 space-y-1">
                     <li><strong>Set your Budget:</strong> Enter the total monthly amount you can afford to pay towards debts.</li>
@@ -141,16 +141,21 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-bold uppercase text-slate-500 mb-1">Payoff Strategy</label>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-bold uppercase text-slate-500">Payoff Strategy</label>
+                        <button id="open-strategy-lab-btn" class="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center">
+                            Compare Strategies
+                            <svg class="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>
+                        </button>
+                    </div>
                     <div class="space-y-2">
                         <select id="strategy-select" class="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-indigo-500 dark:bg-slate-700 dark:border-slate-600">
                             <option value="avalanche">Avalanche (Highest APR First)</option>
                             <option value="snowball">Snowball (Lowest Balance First)</option>
                             <option value="highest-interest-amount">Target Highest Interest Amount</option>
+                            <option value="tsunami">Tsunami (Custom Priority)</option>
+                            <option value="percentage-buffer">Percentage Buffer</option>
                         </select>
-                        <div id="strategy-recommendation" class="hidden text-xs p-2 bg-green-50 text-green-700 border border-green-200 rounded dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                            <!-- Dynamic Recommendation -->
-                        </div>
                     </div>
                 </div>
 
@@ -231,20 +236,64 @@
         <!-- Visualization Column -->
         <div class="lg:col-span-8 space-y-6">
             
-            <div id="quick-details" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
+            <div id="quick-details" class="flex gap-4 mb-4">
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1">
                     <h3 class="text-sm font-bold text-gray-500">Daily Interest</h3>
                     <p id="daily-interest" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
-                    <h3 class="text-sm font-bold text-gray-500">Payoff Time</h3>
-                    <p id="payoff-time" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex flex-col justify-between flex-1">
+                    <h3 class="text-sm font-bold text-gray-500">Freedom Date</h3>
+                    <p id="freedom-date" class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">-</p>
+                    <p id="payoff-time" class="text-[10px] text-gray-400 uppercase mt-1"></p>
                 </div>
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow">
-                    <h3 class="text-sm font-bold text-gray-500">BT Interest Saved</h3>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1">
+                    <h3 class="text-sm font-bold text-gray-500">Interest Ratio</h3>
+                    <div id="interest-ratio-bar" class="w-full h-2 bg-slate-100 rounded-full mt-2 overflow-hidden flex">
+                        <div id="ratio-principal" class="h-full bg-green-500" style="width: 50%"></div>
+                        <div id="ratio-interest" class="h-full bg-red-500" style="width: 50%"></div>
+                    </div>
+                    <p id="interest-ratio-text" class="text-[10px] text-gray-500 mt-1 uppercase">Principal vs Interest</p>
+                </div>
+                <div id="bt-saved" class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1">
+                    <h3 class="text-sm font-bold text-gray-500">BT Saved</h3>
                     <p id="interest-saved" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
             </div>
+
+            <!-- Strategy Gallery / Battle of the Strategies -->
+            <section id="strategy-lab-section" class="bg-indigo-900 text-white p-6 rounded-xl shadow-xl space-y-4 hidden">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold">Strategy Lab</h2>
+                        <p class="text-indigo-300 text-xs">Simulate different "weapons" to defeat your debt.</p>
+                    </div>
+                </div>
+                
+                <div id="strategy-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- Cards will be injected here -->
+                </div>
+
+                <div id="strategy-recommendation" class="bg-indigo-800/80 border border-indigo-400/50 p-3 rounded-lg text-xs leading-relaxed hidden">
+                    <!-- Recommendation injected here -->
+                </div>
+
+                <div class="overflow-hidden rounded-lg border border-indigo-700 bg-indigo-950/50">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-indigo-800 text-indigo-200">
+                            <tr>
+                                <th class="p-2">Strategy</th>
+                                <th class="p-2">Time</th>
+                                <th class="p-2">Interest</th>
+                                <th class="p-2">Motivation</th>
+                                <th class="p-2 text-center text-amber-400">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparison-table-body" class="divide-y divide-indigo-800">
+                            <!-- Comparison rows here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <!-- Charts Area -->
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-6" id="charts-grid">
@@ -307,20 +356,32 @@
                     </div>
                 </div>
 
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm text-left">
-                        <thead class="bg-slate-50 dark:bg-slate-700 text-slate-500 uppercase text-xs">
-                            <tr>
-                                <th class="p-3">Month</th>
-                                <th class="p-3">Action</th>
-                                <th class="p-3 text-right">Payment</th>
-                                <th class="p-3 text-right">Balance</th>
-                            </tr>
-                        </thead>
-                        <tbody id="report-table-body" class="divide-y divide-slate-200 dark:divide-slate-700">
-                            <!-- Rows injected here -->
-                        </tbody>
-                    </table>
+                <div class="relative">
+                    <div id="action-plan-container" class="overflow-x-auto max-h-[400px] overflow-hidden transition-all duration-500 print:max-h-none">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-slate-50 dark:bg-slate-700 text-slate-500 uppercase text-xs">
+                                <tr>
+                                    <th class="p-3">Month</th>
+                                    <th class="p-3">Action</th>
+                                    <th class="p-3 text-right">Payment</th>
+                                    <th class="p-3 text-right">Balance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-table-body" class="divide-y divide-slate-200 dark:divide-slate-700 print:*:break-inside-avoid">
+                                <!-- Rows injected here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Fade Overlay -->
+                    <div id="action-plan-overlay" class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-slate-800 to-transparent pointer-events-none print:hidden"></div>
+                </div>
+
+                <!-- Expansion Toggle -->
+                <div class="flex justify-center mt-4 no-print">
+                    <button id="toggle-action-plan-btn" class="text-indigo-600 dark:text-indigo-400 font-bold text-sm flex items-center hover:underline">
+                        <span>Show Full Action Plan</span>
+                        <svg class="w-4 h-4 ml-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
                 </div>
 
             </section>
@@ -334,6 +395,9 @@
             <div class="p-4">
                 <div class="flex justify-between items-center">
                     <div class="flex-grow flex items-center">
+                        <button class="tsunami-priority-btn mr-3 text-slate-300 hover:text-amber-500 transition-colors" title="Prioritize this card (Tsunami Strategy)">
+                            <svg class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                        </button>
                         <span class="group-name-text text-lg font-bold hidden"></span>
                         <input type="text" class="group-name p-2 text-lg font-bold bg-transparent focus:bg-slate-50 dark:focus:bg-slate-800 rounded" placeholder="e.g., Credit Card">
                         <span class="total-balance font-bold text-slate-500 dark:text-slate-400 ml-4 hidden"></span>
