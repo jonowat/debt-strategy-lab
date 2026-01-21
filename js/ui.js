@@ -372,8 +372,8 @@ function renderReport(simResults, state) {
         // Display BT Actions for the month
         if (m.btActions && m.btActions.length > 0) {
             const btRow = document.createElement('tr');
-            btRow.className = 'bg-indigo-50 dark:bg-indigo-900/50';
-            let btHtml = '<td class="p-3 text-sm" colspan="4"><div class="font-bold text-indigo-600 dark:text-indigo-400">Balance Transfer Actions:</div><ul class="list-disc pl-5">';
+            btRow.className = 'bg-brand-50 dark:bg-brand-900/50';
+            let btHtml = '<td class="p-3 text-sm" colspan="4"><div class="font-bold text-brand-600 dark:text-brand-400">Balance Transfer Actions:</div><ul class="list-disc pl-5">';
             
             // Consolidate BT actions by source card and destination
             const consolidatedActions = {};
@@ -613,9 +613,9 @@ function wireControls(debouncedUpdate, updateApplication) {
                         setTimeout(() => {
                             targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
                             // Highlight effect
-                            targetEl.classList.add('text-indigo-600', 'dark:text-indigo-400', 'transition-colors', 'duration-1000');
+                            targetEl.classList.add('text-brand-600', 'dark:text-brand-400', 'transition-colors', 'duration-1000');
                             setTimeout(() => {
-                                targetEl.classList.remove('text-indigo-600', 'dark:text-indigo-400');
+                                targetEl.classList.remove('text-brand-600', 'dark:text-brand-400');
                             }, 2000);
                         }, 100); // slight delay to allow details expansion
                     }
@@ -657,9 +657,9 @@ function wireControls(debouncedUpdate, updateApplication) {
 
                 labSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 // Brief highlight
-                labSection.classList.add('ring-4', 'ring-indigo-400', 'ring-opacity-50', 'transition-all', 'duration-1000');
+                labSection.classList.add('ring-4', 'ring-brand-400', 'ring-opacity-50', 'transition-all', 'duration-1000');
                 setTimeout(() => {
-                    labSection.classList.remove('ring-4', 'ring-indigo-400', 'ring-opacity-50');
+                    labSection.classList.remove('ring-4', 'ring-brand-400', 'ring-opacity-50');
                 }, 2000);
             }
         });
@@ -861,7 +861,8 @@ function wireControls(debouncedUpdate, updateApplication) {
             groupNameInput.classList.toggle('hidden', isCollapsing);
             groupNameText.classList.toggle('hidden', !isCollapsing);
             groupNameText.textContent = groupNameInput.value;
-            toggleButton.textContent = isCollapsing ? 'Expand' : 'Collapse';
+            toggleButton.title = isCollapsing ? 'Expand' : 'Collapse';
+            toggleButton.dataset.collapsed = isCollapsing ?? null;
             if(isCollapsing) {
                 updateGroupSummary(groupEl);
             }
@@ -920,7 +921,7 @@ function wireControls(debouncedUpdate, updateApplication) {
                 <div class="flex items-center space-x-2">
                     <label class="flex items-center cursor-pointer">
                         <input type="checkbox" class="bt-enabled sr-only peer" checked>
-                        <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 dark:peer-focus:ring-indigo-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-indigo-600"></div>
+                        <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-300 dark:peer-focus:ring-brand-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-brand-600"></div>
                     </label>
                     <button class="remove-bt text-slate-400 hover:text-red-500 text-lg">&times;</button>
                 </div>
@@ -1022,7 +1023,8 @@ function wireControls(debouncedUpdate, updateApplication) {
 function setupGroupElement(el, debouncedUpdate) {
     const groupNameInput = el.querySelector('.group-name');
     const groupNameText = el.querySelector('.group-name-text');
-    const groupIndex = Array.from(document.querySelectorAll('.group-item')).indexOf(el);
+    let groupIndex = Array.from(document.querySelectorAll('.group-item')).indexOf(el);
+    if(groupIndex < 0) groupIndex = document.querySelectorAll('.group-item').length;
     const color = `hsl(${(groupIndex * 70) % 360}, 70%, 50%)`;
     el.style.borderColor = color;
 
@@ -1076,7 +1078,8 @@ function setupGroupElement(el, debouncedUpdate) {
         groupNameInput.classList.toggle('hidden', isCollapsing);
         groupNameText.classList.toggle('hidden', !isCollapsing);
         groupNameText.textContent = groupNameInput.value;
-        toggleBtn.textContent = isCollapsing ? 'Expand' : 'Collapse';
+        toggleBtn.title = isCollapsing ? 'Expand' : 'Collapse';
+        toggleBtn.dataset.collapsed = isCollapsing ?? null;
         if (isCollapsing) {
             updateGroupSummary(el);
         }
@@ -1188,7 +1191,7 @@ function renderStrategyGallery(state, currentSim, debouncedUpdate) {
         const isActive = state.strategy === stratId;
 
         const card = document.createElement('div');
-        card.className = `cursor-pointer p-4 rounded-lg border-2 transition-all relative ${isActive ? 'bg-indigo-800 border-amber-400 scale-105 shadow-lg' : 'bg-indigo-950/40 border-indigo-700 hover:border-indigo-400'}`;
+        card.className = `cursor-pointer p-4 rounded-lg border-2 transition-all relative ${isActive ? 'bg-brand-800 border-amber-400 scale-105 shadow-lg' : 'bg-brand-950/40 border-brand-700 hover:border-brand-400'}`;
         card.innerHTML = `
             <div class="flex items-center space-x-2 mb-2">
                 <span class="text-xl">${meta.icon}</span>
@@ -1197,14 +1200,14 @@ function renderStrategyGallery(state, currentSim, debouncedUpdate) {
                     <span class="inset-0 absolute"></span>
                 </button>
             </div>
-            <p class="text-[10px] text-indigo-200 leading-tight mb-3">${meta.desc}</p>
+            <p class="text-[10px] text-brand-200 leading-tight mb-3">${meta.desc}</p>
             <div class="flex justify-between items-end">
                 <div>
-                    <span class="block text-[8px] text-indigo-300 uppercase">Freedom</span>
+                    <span class="block text-[8px] text-brand-300 uppercase">Freedom</span>
                     <span class="font-bold text-xs">${comp.freedomLabel}</span>
                 </div>
                 <div class="text-right">
-                    <span class="block text-[8px] text-indigo-300 uppercase">Motivation</span>
+                    <span class="block text-[8px] text-brand-300 uppercase">Motivation</span>
                     <span class="text-xs">${"⭐".repeat(Math.ceil(comp.score / 2))}</span>
                 </div>
             </div>
@@ -1225,7 +1228,7 @@ function renderStrategyGallery(state, currentSim, debouncedUpdate) {
         const tr = document.createElement('tr');
         const isCurrent = state.strategy === comp.strategy || (comp.strategy === 'min-only' && state.monthlyBudget <= computeRequiredMinimums(state) + 1);
         
-        tr.className = `cursor-pointer transition-colors ${isCurrent ? 'bg-indigo-700/80 font-semibold' : 'hover:bg-indigo-800/30'}`;
+        tr.className = `cursor-pointer transition-colors ${isCurrent ? 'bg-brand-700/80 font-semibold' : 'hover:bg-brand-800/30'}`;
         
         tr.addEventListener('click', () => {
              const sel = document.getElementById('strategy-select');
@@ -1250,7 +1253,7 @@ function renderStrategyGallery(state, currentSim, debouncedUpdate) {
                     <span>${meta.icon}</span>
                     <div class="font-bold">${meta.name}</div>
                 </div>
-                ${comp.strategy === 'tsunami' ? '<div class="text-[8px] italic text-indigo-300">Using starred cards</div>' : ''}
+                ${comp.strategy === 'tsunami' ? '<div class="text-[8px] italic text-brand-300">Using starred cards</div>' : ''}
             </td>
             <td class="p-2">
                 <div class="font-bold">${fDateLabel}</div>
