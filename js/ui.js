@@ -2,10 +2,63 @@
 // DOM manipulation, Chart.js rendering
 
 import { runSimulation, computeRequiredMinimums, compareStrategies } from './engine.js';
-import { serializeToURL, gatherStateFromDOM, restoreStateToDOM, deserializeFromURL } from './state.js';
+import { serializeToURL, gatherStateFromDOM, restoreStateToDOM, deserializeFromURL, setSessionPassword, getSessionPassword, isAppStateLocked } from './state.js';
 
 let chart = null;
 let costChart = null;
+
+/**
+ * DOM-based password prompt for decryption
+ */
+async function requestPasswordFromUser(isRetry = false) {
+    const modal = document.getElementById('decrypt-modal');
+    const form = document.getElementById('decrypt-form');
+    const input = document.getElementById('decrypt-password-input');
+    const errorMsg = document.getElementById('decrypt-error');
+    const cancelBtn = document.getElementById('cancel-decrypt-btn');
+        const startFreshBtn = document.getElementById('start-fresh-btn');
+
+        if (!modal || !form || !input) return null;
+
+        return new Promise((resolve) => {
+            const showModal = () => {
+                modal.classList.remove('hidden');
+                errorMsg.classList.toggle('hidden', !isRetry);
+                input.value = '';
+                input.focus();
+            };
+
+            const cleanup = () => {
+                modal.classList.add('hidden');
+                form.removeEventListener('submit', handleSubmit);
+                cancelBtn.removeEventListener('click', handleCancel);
+                if (startFreshBtn) startFreshBtn.removeEventListener('click', handleStartFresh);
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                const pwd = input.value;
+                cleanup();
+                resolve(pwd);
+            };
+
+            const handleCancel = () => {
+                cleanup();
+                resolve(null);
+            };
+
+            const handleStartFresh = () => {
+                cleanup();
+                window.location.hash = '';
+                window.location.reload();
+            };
+
+            form.addEventListener('submit', handleSubmit);
+            cancelBtn.addEventListener('click', handleCancel);
+            if (startFreshBtn) startFreshBtn.addEventListener('click', handleStartFresh);
+            showModal();
+        });
+    }
 
 function escapeHTML(str) {
     if (!str) return '';
@@ -518,7 +571,7 @@ function updateGroupSummary(groupEl) {
     }
 }
 
-function wireControls(debouncedUpdate) {
+function wireControls(debouncedUpdate, updateApplication) {
     // Help/Instructions toggle
     const helpBtn = document.getElementById('toggle-help-btn');
     const instructionsPanel = document.getElementById('instructions-panel');
@@ -659,7 +712,84 @@ function wireControls(debouncedUpdate) {
              });
         });
     }
-    
+
+    // Password Protection
+    const passwordModal = document.getElementById('password-modal');
+    const openPasswordBtn = document.getElementById('open-password-btn');
+    const closePasswordBtn = document.getElementById('close-password-modal');
+    const savePasswordBtn = document.getElementById('save-password-btn');
+    const removePasswordBtn = document.getElementById('remove-password-btn');
+    const passwordInput = document.getElementById('password-input');
+
+    if (openPasswordBtn && passwordModal) {
+        openPasswordBtn.addEventListener('click', async () => {
+            // If the app is locked (user has an encrypted URL but hasn't decrypted yet)
+            // we should show the DECRYPT modal instead of the password setup modal.
+            if (isAppStateLocked()) {
+                const state = await deserializeFromURL(requestPasswordFromUser);
+                if (state) {
+                    // Success! Unlock the UI and carry on
+                    document.body.classList.remove('app-locked');
+                    openPasswordBtn.innerHTML = `<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Locked`;
+                    openPasswordBtn.classList.add('bg-amber-100', 'text-amber-800');
+                    
+                    restoreStateToDOM(state);
+                    updateApplication();
+                    // Setup elements
+                    document.querySelectorAll('.group-item').forEach(el => setupGroupElement(el, debouncedUpdate));
+                    document.querySelectorAll('.windfall-item').forEach(el => setupWindfallElement(el, debouncedUpdate));
+                    document.querySelectorAll('.bt-item').forEach(el => setupBtElement(el, debouncedUpdate));
+                }
+                return;
+            }
+
+            const hasPassword = !!getSessionPassword();
+            const passwordPersisted = !!sessionStorage.getItem('dsl_password');
+            const rememberCheck = document.getElementById('remember-password-check');
+            if (rememberCheck) rememberCheck.checked = passwordPersisted;
+            
+            removePasswordBtn.classList.toggle('hidden', !hasPassword);
+            savePasswordBtn.textContent = hasPassword ? 'Update Password' : 'Enable Protection';
+            passwordModal.classList.remove('hidden');
+            passwordInput.value = '';
+            passwordInput.focus();
+        });
+
+        const closeModal = () => passwordModal.classList.add('hidden');
+        if (closePasswordBtn) closePasswordBtn.addEventListener('click', closeModal);
+
+        if (savePasswordBtn) {
+            savePasswordBtn.addEventListener('click', () => {
+                const pwd = passwordInput.value;
+                if (!pwd) {
+                    alert('Please enter a password.');
+                    return;
+                }
+                const rememberCheck = document.getElementById('remember-password-check');
+                const persist = rememberCheck ? rememberCheck.checked : true;
+                setSessionPassword(pwd, persist);
+                
+                closeModal();
+                // Update button label
+                openPasswordBtn.innerHTML = `<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Locked`;
+                openPasswordBtn.classList.add('bg-amber-100', 'text-amber-800');
+                debouncedUpdate();
+            });
+        }
+
+        if (removePasswordBtn) {
+            removePasswordBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to remove password protection? The data in the URL will become visible to anyone.')) {
+                    setSessionPassword(null);
+                    closeModal();
+                    openPasswordBtn.innerHTML = `<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Password Protect`;
+                    openPasswordBtn.classList.remove('bg-amber-100', 'text-amber-800');
+                    debouncedUpdate();
+                }
+            });
+        }
+    }
+
     const calendarModeEl = document.getElementById('use-calendar-mode');
     if (calendarModeEl) {
         calendarModeEl.addEventListener('change', debouncedUpdate);
@@ -700,13 +830,13 @@ function wireControls(debouncedUpdate) {
 
     // Dark mode toggle
     const dm = document.getElementById('dark-mode-toggle');
-    dm.addEventListener('click', () => {
+    dm.addEventListener('click', async () => {
         document.documentElement.classList.toggle('dark');
         // toggle text
         dm.textContent = document.documentElement.classList.contains('dark') ? 'Running in Dark Mode' : 'Running in Light Mode';
         const state = gatherStateFromDOM();
         state.darkMode = document.documentElement.classList.contains('dark');
-        serializeToURL(state);
+        await serializeToURL(state);
     });
 
     // Collapse Debts Section
@@ -1144,7 +1274,7 @@ function renderStrategyGallery(state, currentSim, debouncedUpdate) {
 
 export const ui = {
     init() {
-        function updateApplication() {
+        async function updateApplication() {
             // Check budget but don't stop execution
             const isBudgetValid = validateBudgetAndToggleWarning();
             
@@ -1178,7 +1308,7 @@ export const ui = {
             updateQuickDetails(sim, state);
             renderStrategyGallery(state, sim, debouncedUpdate);
             if(state.fcaSafetyMode) updateFcaWarnings(sim); // New function to handle FCA notifications
-            serializeToURL(state);
+            await serializeToURL(state);
         }
 
         function updateFcaWarnings(simResults) {
@@ -1229,16 +1359,38 @@ export const ui = {
         const debouncedUpdate = debounce(updateApplication, 300);
 
         initChart();
-        wireControls(debouncedUpdate);
+        wireControls(debouncedUpdate, updateApplication);
         
-        const state = deserializeFromURL();
-        if (state) {
-            restoreStateToDOM(state);
-            updateApplication();
-            document.querySelectorAll('.group-item').forEach(el => setupGroupElement(el, debouncedUpdate));
-            document.querySelectorAll('.windfall-item').forEach(el => setupWindfallElement(el, debouncedUpdate));
-            document.querySelectorAll('.bt-item').forEach(el => setupBtElement(el, debouncedUpdate));
-        }
+        (async () => {
+            const state = await deserializeFromURL(requestPasswordFromUser);
+            
+            if (isAppStateLocked()) {
+                document.body.classList.add('app-locked');
+                const openPasswordBtn = document.getElementById('open-password-btn');
+                if (openPasswordBtn) {
+                    openPasswordBtn.innerHTML = `<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Locked (Encrypted)`;
+                    openPasswordBtn.classList.add('bg-amber-100', 'text-amber-800');
+                }
+            } else {
+                document.body.classList.remove('app-locked');
+            }
+
+            if (getSessionPassword()) {
+                const openPasswordBtn = document.getElementById('open-password-btn');
+                if (openPasswordBtn) {
+                    openPasswordBtn.innerHTML = `<svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path></svg> Locked`;
+                    openPasswordBtn.classList.add('bg-amber-100', 'text-amber-800');
+                }
+            }
+
+            if (state) {
+                restoreStateToDOM(state);
+                updateApplication();
+                document.querySelectorAll('.group-item').forEach(el => setupGroupElement(el, debouncedUpdate));
+                document.querySelectorAll('.windfall-item').forEach(el => setupWindfallElement(el, debouncedUpdate));
+                document.querySelectorAll('.bt-item').forEach(el => setupBtElement(el, debouncedUpdate));
+            }
+        })();
     }
 };
 

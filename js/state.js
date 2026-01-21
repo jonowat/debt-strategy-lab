@@ -11,6 +11,80 @@ function escapeHTML(str) {
         .replace(/'/g, '&#039;');
 }
 
+async function deriveKey(password, salt) {
+    const encoder = new TextEncoder();
+    const crypto = window.crypto || globalThis.crypto;
+    const passwordKey = await crypto.subtle.importKey(
+        'raw', 
+        encoder.encode(password), 
+        'PBKDF2', 
+        false, 
+        ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+        {
+            name: 'PBKDF2',
+            salt: salt,
+            iterations: 100000,
+            hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+export async function encryptData(text, password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(text);
+    const crypto = window.crypto || globalThis.crypto;
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    
+    const encrypted = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: iv },
+        key,
+        data
+    );
+
+    const combined = new Uint8Array(salt.length + iv.length + encrypted.byteLength);
+    combined.set(salt, 0);
+    combined.set(iv, salt.length);
+    combined.set(new Uint8Array(encrypted), salt.length + iv.length);
+    
+    // Use standard btoa after converting to binary string
+    return 'enc:' + btoa(String.fromCharCode(...combined));
+}
+
+export async function decryptData(encryptedBase64, password) {
+    try {
+        const combined = new Uint8Array(
+            atob(encryptedBase64.replace('enc:', ''))
+                .split('')
+                .map(c => c.charCodeAt(0))
+        );
+        
+        const salt = combined.slice(0, 16);
+        const iv = combined.slice(16, 28);
+        const data = combined.slice(28);
+        
+        const key = await deriveKey(password, salt);
+        const crypto = window.crypto || globalThis.crypto;
+        const decrypted = await crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv: iv },
+            key,
+            data
+        );
+        
+        return new TextDecoder().decode(decrypted);
+    } catch (e) {
+        console.error('Decryption failed', e);
+        return null;
+    }
+}
+
 function encodeState(obj) {
     try {
         const json = JSON.stringify(obj);
@@ -29,16 +103,93 @@ function decodeState(str) {
     }
 }
 
-export function serializeToURL(stateObj) {
-    const encoded = encodeState(stateObj);
-    if (encoded) {
-        window.location.hash = encoded;
+let _inMemoryPassword = null;
+let _isLocked = false;
+
+export function isAppStateLocked() {
+    return _isLocked;
+}
+
+export function setSessionPassword(password, persist = true) {
+    _inMemoryPassword = password;
+    if (password) _isLocked = false; // Successfully set a password, so we're not locked
+    if (persist && password) {
+        sessionStorage.setItem('dsl_password', password);
+    } else {
+        sessionStorage.removeItem('dsl_password');
     }
 }
 
-export function deserializeFromURL() {
+export function getSessionPassword() {
+    return _inMemoryPassword || sessionStorage.getItem('dsl_password');
+}
+
+export async function serializeToURL(stateObj) {
+    const currentHash = (window.location.hash || '').replace(/^#/, '');
+    const password = getSessionPassword();
+    
+    // Safety check: If we are currently on an encrypted URL but don't have the password,
+    // we should NOT overwrite the URL because we haven't successfully "unlocked" yet.
+    // This prevents accidental loss of encrypted data when playing with default values.
+    if (currentHash.startsWith('enc:') && !password) {
+        return;
+    }
+
+    let encoded;
+    
+    if (password) {
+        const json = JSON.stringify(stateObj);
+        encoded = await encryptData(json, password);
+    } else {
+        encoded = encodeState(stateObj);
+    }
+
+    if (encoded) {
+        // Use replaceState to avoid cluttering history as requested
+        const url = new URL(window.location);
+        url.hash = encoded;
+        window.history.replaceState(null, '', url);
+    }
+}
+
+export async function deserializeFromURL(promptHandler = null) {
     const hash = (window.location.hash || '').replace(/^#/, '');
     if (!hash) return null;
+
+    if (hash.startsWith('enc:')) {
+        let password = getSessionPassword();
+        if (!password) _isLocked = true;
+        let retryCount = 0;
+
+        while (true) {
+            if (!password) {
+                if (promptHandler) {
+                    password = await promptHandler(retryCount > 0);
+                } else {
+                    password = prompt('This link is password protected. Please enter the password to gain access to the data:');
+                }
+                
+                if (!password) return null; // Cancelled
+            }
+            
+            const decryptedJson = await decryptData(hash, password);
+            if (decryptedJson) {
+                // Success! Ensure it's stored for this session
+                setSessionPassword(password, false); 
+                return JSON.parse(decryptedJson);
+            } else {
+                // Fail
+                password = null;
+                setSessionPassword(null); // Clear invalid cached password
+                retryCount++;
+                if (!promptHandler) {
+                    alert('Incorrect password.');
+                    return null;
+                }
+            }
+        }
+    }
+    
     return decodeState(hash);
 }
 
@@ -263,4 +414,8 @@ export default {
     deserializeFromURL,
     gatherStateFromDOM,
     restoreStateToDOM,
+    setSessionPassword,
+    getSessionPassword,
+    encryptData,
+    decryptData,
 };

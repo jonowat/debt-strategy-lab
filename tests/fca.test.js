@@ -36,31 +36,31 @@ export const FCAScenarios = {
     })
 };
 
-console.log('Running FCA Compliance Tests...\n');
+export const run = async () => {
+    console.log('Running FCA Compliance Tests...\n');
 
-test('FCA: Tracks Interest vs Principal History', () => {
-    const s = FCAScenarios.highInterestDebt();
-    const results = runSimulation(s, { maxMonths: 24 });
-    const m18 = results.months[17];
-    
-    // We expect the segment objects in the results to now have FCA data
-    const seg = m18.segments.find(x => x.id === '0-0');
-    
-    // Verify properties exist
-    assert.strictEqual(typeof seg.pdMonths, 'number', 'Segment should have pdMonths');
-    assert.strictEqual(typeof seg.isPersistentDebt, 'boolean', 'Segment should have isPersistentDebt flag');
-});
+    await test('FCA: Tracks Interest vs Principal History', () => {
+        const s = FCAScenarios.highInterestDebt();
+        const results = runSimulation(s, { maxMonths: 24 });
+        const m18 = results.months[17];
+        
+        // We expect the segment objects in the results to now have FCA data
+        const seg = m18.segments.find(x => x.id === '0-0');
+        
+        // Verify properties exist
+        assert.strictEqual(typeof seg.pdMonths, 'number', 'Segment should have pdMonths');
+        assert.strictEqual(typeof seg.isPersistentDebt, 'boolean', 'Segment should have isPersistentDebt flag');
+    });
 
-test('FCA: Detects Stage 1 (18 months)', () => {
-    const s = FCAScenarios.existingPD();
-    // Start at 17 months. After 1 month of high interest, it should hit 18.
-    const results = runSimulation(s, { maxMonths: 5 });
-    
-    const m1 = results.months[0]; // Month 1 (Cumulative 18)
-    const seg = m1.segments[0];
-    
-    assert.strictEqual(seg.pdMonths, 18, 'Should be flagged as 18 months PD');
-    assert.strictEqual(seg.isPersistentDebt, true, 'isPersistentDebt should be true');
-});
-
-export const run = () => {};
+    await test('FCA: Detects Stage 1 (18 months)', () => {
+        const s = FCAScenarios.existingPD();
+        // Start at 17 months. After 1 month of high interest, it should hit 18.
+        const results = runSimulation(s, { maxMonths: 5 });
+        
+        const m1 = results.months[0]; // Month 1 (Cumulative 18)
+        const seg = m1.segments[0];
+        
+        assert.strictEqual(seg.pdMonths, 18, 'Should be flagged as 18 months PD');
+        assert.strictEqual(seg.isPersistentDebt, true, 'isPersistentDebt should be true');
+    });
+};

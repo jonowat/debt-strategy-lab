@@ -10,14 +10,14 @@ let testsPassed = 0;
 let testsFailed = 0;
 let testsSkipped = 0;
 
-function test(name, fn) {
+async function test(name, fn) {
     if (filter && !name.toLowerCase().includes(filter.toLowerCase())) {
         testsSkipped++;
         return;
     }
     testsRun++;
     try {
-        fn();
+        await fn();
         console.log(`✅ PASS: ${name}`);
         testsPassed++;
     } catch (e) {
@@ -67,10 +67,10 @@ function filterAndRunTests() {
     testFiles.forEach(file => {
         //if (!filter || file.toLowerCase().includes(filter.toLowerCase())) {
             import(`file://${file}`)
-                .then(module => {
+                .then(async module => {
                     // Check if the module exports a 'run' function and call it
                     if (module.run) {
-                        module.run();
+                        await module.run();
                     }
                 })
                 .catch(err => {

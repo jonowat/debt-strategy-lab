@@ -13,3 +13,16 @@
     .print-only { display: block; }
 }
 .group-card { border-left: 4px solid #6366f1; }
+
+/* Locked state - prevents interaction while decryption is pending */
+.app-locked main {
+    filter: blur(5px);
+    pointer-events: none;
+    opacity: 0.6;
+    user-select: none;
+}
+
+.app-locked footer {
+     filter: blur(2px);
+     opacity: 0.8;
+}
