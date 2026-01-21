@@ -11,15 +11,23 @@ A local-first, browser-based simulator for visualizing debt payoff strategies. C
   - **Avalanche**: Targets highest interest rate first (mathematically optimal).
   - **Snowball**: Targets lowest balance first (psychologically motivating).
   - **Highest Interest Amount**: Targets the debt generating the most raw interest currency per month.
+  - **Tsunami**: Targets user-selected "Starred" priority cards first (Emotional/Custom priority).
+  - **The Buffer**: Pays Minimum + 10% on all cards to build a scalable safety margin.
+- **UK FCA Compliance Mode**:
+  - **Persistent Debt Tracking**: Monitors 18-month rolling windows for Interest > Principal ratios.
+  - **Safety Floor**: Automatically allocates extra budget to cards nearing Stage 3 suspension (36 months).
+  - **Intervention Detection**: Visualizes Stage 1, 2, and 3 warnings in the UI.
 - **Detailed Modelling**:
   - Support for multiple Cards/Loans with different minimum payment definitions.
   - **Promotional APRs**: Model "0% for 12 months" segments on credit cards.
   - **Balance Transfers**: Simulate moving debt to a new card with a 3% fee and 0% APR period, determining if the fee is worth the interest savings.
   - **Windfalls**: Add one-off lump sum payments (e.g., tax refunds, bonuses) at specific months.
 - **Interactive Visualizations**:
-  - **Payoff Timeline**: Dynamic line chart showing balance reduction over time.
+  - **Strategy Gallery**: Comparison dashboard showing "Time to Freedom" and "Motivation Score" for all strategies side-by-side.
+  - **Payoff Timeline**: Dynamic line chart showing balance reduction over time with "Ghost Line" baseline comparison.
   - **Cost Breakdown**: Donut chart visualizing Principal vs. Interest vs. Fees.
   - **"What-If" Slider**: Drag your monthly budget to instantly see how extra payments shorten your timeline.
+  - **Granular Action Plan**: Detailed month-by-month table of payments (expandable).
 
 ## Calculations & Assumptions
 
@@ -38,8 +46,9 @@ The simulator uses a monthly cycle for all projections. While real-world daily c
 1.  **Accrue Interest**: Interest for the current month is added to the balance.
 2.  **Minimums First**: The "Required Minimum" for *every* debt is paid first from the monthly budget.
 3.  **Windfalls**: Any lump sums defined for the current month are added to the "Available Budget" (after minimums).
-4.  **Strategy Allocation**: Any remaining budget (Surplus) is applied to the target debt determined by the selected strategy (e.g., Highest APR).
-5.  **Balance Transfers**: If a BT offer is active and triggered (Month 1), the engine moves balance from high-APR segments to the new BT segment, applying the defined fee immediately.
+4.  **FCA Safety Floor** (If enabled): Prioritizes payments to cards at risk of suspension (Stage 2/27+ months Persistent Debt) to ensure the 1:1 repayment ratio is met.
+5.  **Strategy Allocation**: Any remaining budget (Surplus) is applied to the target debt determined by the selected strategy (e.g., Highest APR).
+6.  **Balance Transfers**: If a BT offer is active and triggered (Month 1), the engine moves balance from high-APR segments to the new BT segment, applying the defined fee immediately.
 
 ### 4. Balance Transfers
 - Fees are added to the balance of the *new* card immediately.

@@ -106,7 +106,39 @@
                                 <li><strong>Stage 2 (27mo):</strong> Bank issues a stronger warning of potential suspension.</li>
                                 <li><strong>Stage 3 (36mo):</strong> Bank may suspend your card and force a repayment plan.</li>
                             </ul>
-                            <p class="mt-1 text-xs italic">If enabled, this tool prioritizes payments to keep you out of Stage 3 suspension zones.</p>
+                            <p class="mt-1 text-xs italic">If enabled, this tool prioritizes payments to keep you out of Stage 3 suspension zones, within your monthly budget.</p>
+                        </dd>
+                    </div>
+                </dl>
+            </details>
+            
+            <details id="instructions-strategies" class="group mt-2">
+                <summary class="cursor-pointer text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                    Payoff Strategies Explained
+                </summary>
+                <dl class="mt-3 text-sm text-slate-600 dark:text-slate-400 space-y-3">
+                    <div>
+                        <dt class="font-bold text-slate-700 dark:text-slate-200">Avalanche (Mathematically Optimal)</dt>
+                        <dd class="mt-1 ml-4">
+                            Focuses all extra money on the debt with the <strong>Highest APR</strong>. This reduces interest accumulation the fastest and saves you the most money.
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-bold text-slate-700 dark:text-slate-200">Snowball (Psychological Momentum)</dt>
+                        <dd class="mt-1 ml-4">
+                            Focuses all extra money on the <strong>Lowest Balance</strong>. Clearing small debts quickly builds motivation ("Quick Wins") but costs more in interest.
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-bold text-slate-700 dark:text-slate-200">Tsunami (Custom Priority)</dt>
+                        <dd class="mt-1 ml-4">
+                            Focuses on cards you have manually <strong>Starred</strong> (⭐) in the list. Useful if you want to close a specific account regardless of math (e.g. a joint account or a card with difficult customer service).
+                        </dd>
+                    </div>
+                     <div>
+                        <dt class="font-bold text-slate-700 dark:text-slate-200">The Buffer (Scalability)</dt>
+                        <dd class="mt-1 ml-4">
+                            Instead of targeting one debt, this spreads your extra cash to pay the <strong>Minimum + 10%</strong> on every card. Good for preventing minimum payment creep but often slower to clear individual cards.
                         </dd>
                     </div>
                 </dl>
@@ -238,24 +270,24 @@
             
             <div id="quick-details" class="flex gap-4 mb-4">
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1">
-                    <h3 class="text-sm font-bold text-gray-500">Daily Interest</h3>
+                    <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400">Daily Interest</h3>
                     <p id="daily-interest" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
                 <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex flex-col justify-between flex-1">
-                    <h3 class="text-sm font-bold text-gray-500">Freedom Date</h3>
+                    <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400">Freedom Date</h3>
                     <p id="freedom-date" class="text-2xl font-bold text-indigo-600 dark:text-indigo-400">-</p>
                     <p id="payoff-time" class="text-[10px] text-gray-400 uppercase mt-1"></p>
                 </div>
-                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1">
-                    <h3 class="text-sm font-bold text-gray-500">Interest Ratio</h3>
-                    <div id="interest-ratio-bar" class="w-full h-2 bg-slate-100 rounded-full mt-2 overflow-hidden flex">
-                        <div id="ratio-principal" class="h-full bg-green-500" style="width: 50%"></div>
-                        <div id="ratio-interest" class="h-full bg-red-500" style="width: 50%"></div>
+                <div class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1  text-gray-500 dark:text-gray-400">
+                    <h3 class="text-sm font-bold">Interest Ratio</h3>
+                    <div id="interest-ratio-bar" class="w-full bg-slate-100 rounded-full  mt-2 mb-5 h-2  flex text-xs ">
+                        <div id="ratio-principal" class="h-full bg-green-500 dark:bg-green-700 py-0.5 rounded-l-full relative" style="width: 50%"><span class="absolute top-2 text-center w-full"></span></div>
+                        <div id="ratio-interest" class="h-full bg-red-500 dark:bg-red-700 py-0.5 rounded-r-full relative" style="width: 50%"><span class="absolute top-2 text-center w-full"></span></div>
                     </div>
-                    <p id="interest-ratio-text" class="text-[10px] text-gray-500 mt-1 uppercase">Principal vs Interest</p>
+                    <p id="interest-ratio-text" class="text-[10px] text-gray-500 dark:text-gray-400 mt-1 uppercase">Principal vs Interest</p>
                 </div>
                 <div id="bt-saved" class="bg-white dark:bg-slate-800 p-4 rounded-lg shadow flex-1">
-                    <h3 class="text-sm font-bold text-gray-500">BT Saved</h3>
+                    <h3 class="text-sm font-bold text-gray-500 dark:text-gray-400">BT Saved</h3>
                     <p id="interest-saved" class="text-2xl font-bold text-gray-800 dark:text-slate-100"></p>
                 </div>
             </div>
@@ -332,7 +364,7 @@
             <section id="report-section" class="bg-white dark:bg-slate-800 p-6 rounded-lg shadow space-y-4 hidden">
                 <div class="flex justify-between items-center">
                     <h2 class="text-xl font-bold text-indigo-600 dark:text-indigo-400">Granular Action Plan</h2>
-                    <div class="flex space-x-2">
+                    <div class="flex space-x-2 no-print">
                         <!-- CSV Export Button -->
                         <button id="export-csv-btn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm px-3 py-2 rounded mt-4 flex items-center transition">
                             <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>

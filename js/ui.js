@@ -1022,7 +1022,10 @@ function updateQuickDetails(sim, state
         const intRatio = sim.firstMonthInterestRatio * 100;
         const prinRatio = 100 - intRatio;
         ratioPrincipal.style.width = `${prinRatio}%`;
+        ratioPrincipal.querySelector('span').textContent = `${prinRatio.toFixed(1)}%`;
         ratioInterest.style.width = `${intRatio}%`;
+        ratioInterest.querySelector('span').textContent = `${intRatio.toFixed(1)}%`;
+
     }
 
     interestSavedEl.textContent = `${formatCurrency(sim.interestSavedFromBT || 0)}`;
